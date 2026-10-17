@@ -403,7 +403,7 @@ let DB = null, MODE = "local", downloads = null, FB = null, AUTH = null, install
 const HOSTED = !(window.claude && typeof window.claude.use === "function");
 const STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {} };
+const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [] };
 const CONF = window.PARQUETEC_FIREBASE || {};
 const meuEmail = () => String(AUTH && AUTH.email || "").toLowerCase();
 const souDono = () => !!(CONF.dono && meuEmail() === String(CONF.dono).toLowerCase());
@@ -445,7 +445,7 @@ function subscribeAll() {
   listen("parados", DB.collection("parados"), s => { S.parados = docsOf(s); });
   listen("inv", DB.doc("config/inventario"), s => { S.inv = s.exists ? (s.data().itens || {}) : {}; });
   listen("recados", DB.collection("recados").orderBy("em", "desc").limit(60), s => { S.recados = docsOf(s); });
-  subscribeHist(); subscribeReservas();
+  subscribeHist(); subscribeReservas(); subscribeResHoje();
   if (MODE === "firebase") listen("acessos", DB.collection("acessos"), s => {
     S.acessos = docsOf(s);
     const a = meuAcesso();
@@ -453,6 +453,7 @@ function subscribeAll() {
   });
 }
 function subscribeHist() { listen("hist", DB.collection("emprestimos").orderBy("retiradoEm", "desc").limit(ui.histLimit), s => { S.hist = docsOf(s); }); }
+function subscribeResHoje() { listen("resHoje", DB.collection("reservas").where("data", "==", dayKey()), s => { S.resHoje = docsOf(s); }); }
 function subscribeReservas() { listen("reservas", DB.collection("reservas").where("data", "==", ui.date), s => { S.reservas = docsOf(s); }); }
 
 function errMsg(e) {
@@ -499,6 +500,30 @@ function codeGrid(codes, btn) {
   for (const c of codes) { const m = inv(c).modelo || ""; if (!g.has(m)) g.set(m, []); g.get(m).push(c); }
   if (g.size === 1 && g.has("")) return `<div class="codes">${codes.map(btn).join("")}</div>`;
   return [...g].map(([m, l]) => `<div class="grp"><span>${esc(m || "Sem modelo")}</span><span>${l.length}</span></div><div class="codes">${l.map(btn).join("")}</div>`).join("");
+}
+const somaQ = (o) => Object.values(o || {}).reduce((a, n) => a + (parseInt(n) || 0), 0);
+function resumoItens(itens, total, tipo) {
+  const e = Object.entries(itens || {}).filter(([, n]) => Number(n) > 0);
+  if (!e.length) return `${total} ${Number(total) === 1 ? TIPOS[tipo].um : TIPOS[tipo].nome.toLowerCase()}`;
+  return e.map(([m, n]) => `${n} ${m}`).join(" + ");
+}
+function resumoCodes(codes, tipo) {
+  const o = {}; let semModelo = 0;
+  for (const c of codes) { const m = inv(c).modelo; if (m) o[m] = (o[m] || 0) + 1; else semModelo++; }
+  if (semModelo) { if (!Object.keys(o).length) return resumoItens(null, codes.length, tipo); o["sem modelo"] = semModelo; }
+  return resumoItens(o, codes.length, tipo);
+}
+// Quantos ainda dá para agendar numa aula: no total e de cada modelo.
+function livresSlot(t, seg, idx) {
+  const st = stats(t), par = paradosMap();
+  const res = S.reservas.filter(r => r.tipo === t && r.seg === seg && r.aula === idx);
+  const total = Math.max(0, st.parque - st.manut - res.reduce((a, r) => a + (Number(r.qtd) || 0), 0));
+  const porModelo = {};
+  for (const m of modelosDe(t)) {
+    const cap = codesFor(t).filter(c => inv(c).modelo === m && !par.has(c)).length;
+    porModelo[m] = Math.max(0, Math.min(cap - res.reduce((a, r) => a + (Number((r.itens || {})[m]) || 0), 0), total));
+  }
+  return { total, porModelo };
 }
 function modelosDe(t) { return [...new Set(codesFor(t).map(c => inv(c).modelo).filter(Boolean))]; }
 const opNome = () => operador ? operador.nome : "";
@@ -615,6 +640,17 @@ function installCard() {
   return "";
 }
 
+function agendadosHoje(t) {
+  const ordem = (r) => (r.seg === "medio" ? 0 : 100) + (Number(r.aula) || 0);
+  const lista = S.resHoje.filter(r => r.tipo === t).sort((a, b) => ordem(a) - ordem(b));
+  if (!lista.length) return "";
+  const feito = (r) => S.abertos.some(e => e.reservaId === r.id) || S.hist.some(e => e.reservaId === r.id);
+  const rows = lista.map(r => { const a = (cfg().horarios[r.seg] || [])[r.aula] || {};
+    return `<div class="row"><div class="grow"><div class="t">${esc(r.pessoaNome)}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}</div></div>
+      ${feito(r) ? `<span class="badge">retirado</span>` : `<button class="btn go sm" data-act="retirar-res" data-id="${r.id}">Retirar</button>`}</div>`; }).join("");
+  return `<section class="card"><div class="sec-h"><h2>Agendados para hoje</h2><span class="note">${lista.length}</span></div>
+    <p class="note" style="margin:0 0 4px">Agendar só reserva. Os ${TIPOS[t].nome.toLowerCase()} passam para “Em uso” quando a pessoa retira.</p><div class="list">${rows}</div></section>`;
+}
 function porModelo(t) {
   const ms = modelosDe(t); if (!ms.length) return "";
   const uso = emUsoMap(), par = paradosMap();
@@ -639,7 +675,7 @@ function vPainel() {
       const pend = pendentes(e), velho = dayKey(new Date(e.retiradoEm)) !== hoje;
       return `<div class="row"><div class="grow">
           <div class="t">${esc(e.pessoaNome)} ${velho ? `<span class="badge late">desde ${esc(dayLabel(dayKey(new Date(e.retiradoEm)))[0] || fmtLong.format(new Date(e.retiradoEm)))}</span>` : ""}</div>
-          <div class="s">${esc(e.finalidade)}${e.turma ? " · " + esc(e.turma) : ""} · retirou às ${hhmm(e.retiradoEm)} · ${pend.length} ${pend.length === 1 ? TIPOS[e.tipo].um : TIPOS[e.tipo].nome.toLowerCase()}</div>
+          <div class="s">${esc(e.finalidade)}${e.turma ? " · " + esc(e.turma) : ""} · retirou às ${hhmm(e.retiradoEm)} · ${esc(resumoCodes(pend, e.tipo))}</div>
           <div class="chips">${pend.map(c => `<span class="chip" title="${esc(dicaCod(c))}">${c}</span>`).join("")}</div>
         </div><button class="btn back sm" data-act="devolver" data-id="${e.id}">Devolver</button></div>`;
     }).join("")}</div>`;
@@ -653,11 +689,11 @@ function vPainel() {
       <div class="tile t-park"><span class="lbl">Total no parque</span><span class="num">${st.parque}</span></div>
     </div>
     <div class="note">Em manutenção: ${st.manut} · Baixados: ${st.baixa} (fora do parque) · Cadastrados: ${st.total}</div>
+    ${agendadosHoje(ui.tipo)}
     ${porModelo(ui.tipo)}
     <section class="card"><div class="sec-h"><h2>Em uso agora</h2>${abertos.length ? `<span class="note">${abertos.length} ${abertos.length === 1 ? "retirada" : "retiradas"}</span>` : ""}</div>${lista}</section>`;
 }
 
-function reservadosSlot(t, seg, idx) { return S.reservas.filter(r => r.tipo === t && r.seg === seg && r.aula === idx).reduce((s, r) => s + (Number(r.qtd) || 0), 0); }
 function vAgenda() {
   if (!S.config) return setupCard();
   const [rel, base] = dayLabel(ui.date);
@@ -665,12 +701,12 @@ function vAgenda() {
   const aulas = cfg().horarios[ui.seg] || [];
   const slots = aulas.map((a, i) => {
     const res = S.reservas.filter(r => r.tipo === ui.tipo && r.seg === ui.seg && r.aula === i);
-    const livres = Math.max(0, noParque - reservadosSlot(ui.tipo, ui.seg, i));
+    const livres = livresSlot(ui.tipo, ui.seg, i).total;
     return `<div class="slot">
       <div><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.ini)} às ${esc(a.fim)}</div></div>
       <div class="free ${livres ? "" : "zero"}"><b>${livres}</b><small>livres</small></div>
       <button class="btn go sm" data-act="agendar" data-i="${i}" ${livres ? "" : "disabled"}>Agendar</button>
-      ${res.length ? `<div class="res">${res.map(r => `<div class="res-i"><div class="grow"><b>${esc(r.pessoaNome)}</b> · ${r.qtd} ${r.qtd == 1 ? TIPOS[r.tipo].um : TIPOS[r.tipo].nome.toLowerCase()}${r.turma ? " · " + esc(r.turma) : ""}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
+      ${res.length ? `<div class="res">${res.map(r => `<div class="res-i"><div class="grow"><b>${esc(r.pessoaNome)}</b> · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}${r.turma ? " · " + esc(r.turma) : ""}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
         ${ui.date === dayKey() ? `<button class="mini" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : ""}
         <button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : "Cancelar"}</button></div>`).join("")}</div>` : ""}
     </div>`;
@@ -716,7 +752,7 @@ function vHistorico() {
         const estado = pend.length ? `<b style="color:var(--use-ink)">em uso (${pend.length})</b>` : `devolvido às ${hhmm(e.devolvidoEm || ultima)}`;
         return `<div class="row"><span class="dot ${pend.length ? "open" : ""}"></span><div class="grow">
           <div class="t">${esc(e.pessoaNome)}${e.turma ? ` <span class="note">· ${esc(e.turma)}</span>` : ""}</div>
-          <div class="s">${esc(e.finalidade)} · ${estado}${e.operador ? ` · autorizado por ${esc(e.operador)}` : ""}${e.obs ? ` · ${esc(e.obs)}` : ""}</div>
+          <div class="s">${esc(e.finalidade)} · ${esc(resumoCodes(e.codes || [], e.tipo))} · ${estado}${e.operador ? ` · autorizado por ${esc(e.operador)}` : ""}${e.obs ? ` · ${esc(e.obs)}` : ""}</div>
           <div class="chips">${(e.codes || []).map(c => `<span class="chip ${dev[c] ? "done" : ""}">${c}</span>`).join("")}</div>
         </div><span class="time">${hhmm(e.retiradoEm)}</span></div>`;
       }).join("")}</div></section>`;
@@ -747,7 +783,22 @@ function vGerenciar() {
       <label class="f">Início<input class="inp" id="h-${seg}-${i}-ini" type="time" value="${esc(a.ini)}"></label>
       <label class="f">Fim<input class="inp" id="h-${seg}-${i}-fim" type="time" value="${esc(a.fim)}"></label>
       <button class="x hx" data-act="h-del" data-seg="${seg}" data-i="${i}" aria-label="Remover ${esc(a.nome)}">×</button></div>`).join("");
-  return `${adm ? `<section class="card stack">
+  const aba = adm ? (ui.gerAba || "pessoas") : "pessoas";
+  const abas = adm ? [["pessoas", "Pessoas"], ["equip", "Equipamentos"], ...(MODE === "firebase" ? [["acessos", "Acessos"]] : []), ["ajustes", "Ajustes"]] : [];
+  const segAbas = abas.length ? `<div class="seg small" role="group" aria-label="Partes do Gerenciar">${abas.map(([k, l]) => `<button data-act="ger-aba" data-v="${k}" aria-pressed="${aba === k}">${l}</button>`).join("")}</div>` : "";
+  const instalar = `${HOSTED ? `<section class="card stack">
+      <h2 style="font-size:17px">Instalar em outro aparelho</h2>
+      <ol class="steps">
+        <li><b>Computador (Chrome ou Edge):</b> abra este endereço e clique no ícone de instalar no fim da barra de endereço, ou no menu ⋮ → “Instalar ParqueTEC”.</li>
+        <li><b>Android (Chrome):</b> menu ⋮ → “Instalar app” ou “Adicionar à tela inicial”.</li>
+        <li><b>iPhone (Safari):</b> Compartilhar → “Adicionar à Tela de Início”.</li>
+      </ol>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="app-url" readonly value="${esc(location.href.split("#")[0])}" style="flex:1;min-width:200px"><button class="btn ghost sm" data-act="copiar-url">Copiar endereço</button></div>
+      ${installEvt ? `<button class="btn block" data-act="instalar">Instalar neste aparelho</button>` : ""}
+    </section>` : ""}`;
+  const conta = `${MODE === "firebase" && AUTH ? `<section class="card" style="display:flex;align-items:center;gap:10px"><div class="grow" style="flex:1;min-width:0"><div class="note">Conectado como${adm ? " · coordenação" : ""}</div><b style="overflow-wrap:anywhere">${esc(AUTH.email || "")}</b></div><button class="mini" data-act="mudar-senha">Mudar senha</button><button class="btn ghost sm" data-act="sair">Sair</button></section>` : ""}`;
+  if (aba === "equip") return `${segAbas}
+    <section class="card stack">
       <div><h2 style="font-size:17px">Manutenção e baixa</h2><p class="note" style="margin:4px 0 0">Toque no código para mandar o equipamento para manutenção ou dar baixa. Se ele estiver em uso, a devolução é registrada sozinha.</p></div>
       ${tipoSeg("", t, "ger-tipo")}
       <input class="inp" id="ger-q" type="search" placeholder="Buscar código, modelo ou patrimônio" value="${esc(ui.gerQ)}">
@@ -755,8 +806,30 @@ function vGerenciar() {
       <div class="legend"><span><i style="background:var(--surface);border:1px solid var(--line)"></i>No parque</span><span><i style="background:var(--use-bg)"></i>Em uso</span><span><i style="background:var(--stop-bg)"></i>Manutenção</span><span><i style="background:color-mix(in srgb,var(--muted) 28%,var(--surface))"></i>Baixado</span></div>
       ${manut.length ? `<div><div class="step">Em manutenção (${manut.length})</div><div class="list">${parList(manut)}</div></div>` : ""}
       ${baixa.length ? `<div><div class="step">Baixados (${baixa.length})</div><p class="note" style="margin:2px 0 0">Fora do parque. Continuam no histórico.</p><div class="list">${parList(baixa)}</div></div>` : ""}
-    </section>` : ""}
-
+    </section>
+    ${vInventario()}`;
+  if (aba === "acessos") return `${segAbas}${vAcessos()}`;
+  if (aba === "ajustes") return `${segAbas}
+    <section class="card stack">
+      <h2 style="font-size:17px">Quantos equipamentos a escola tem</h2>
+      <div class="grid2">
+        <label class="f">Notebooks<input class="inp" id="c-nb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.notebooks) || 0}"></label>
+        <label class="f">Tablets<input class="inp" id="c-tb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.tablets) || 0}"></label>
+      </div>
+      <p class="note" style="margin:0">Os códigos vão de NB-001 a NB-${String(Number(c.notebooks) || 0).padStart(3, "0")} e de TB-001 a TB-${String(Number(c.tablets) || 0).padStart(3, "0")}. Máximo de 200 de cada.</p>
+      <h2 style="font-size:17px;margin-top:6px">Horários das aulas</h2>
+      ${Object.entries(SEGS).map(([seg, l]) => `<div class="stack" style="gap:8px"><div class="step">${l}</div>${hor(seg)}<button class="mini" style="align-self:flex-start" data-act="h-add" data-seg="${seg}">+ adicionar aula</button></div>`).join("")}
+      <h2 style="font-size:17px;margin-top:6px">Contato</h2>
+      <label class="f">WhatsApp da escola<input class="inp" id="c-wa" inputmode="tel" placeholder="5511999998888" value="${esc(c.whatsapp)}"></label>
+      <p class="note" style="margin:0">Só números, com o código do país (55) e o DDD. O botão WhatsApp some se este campo ficar vazio.</p>
+      <h2 style="font-size:17px;margin-top:6px">Proteção</h2>
+      <label class="f">PIN para abrir Gerenciar (opcional)<input class="inp" id="c-pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="${c.pinHash ? "PIN ativo. Digite um novo para trocar" : "Deixe vazio para não usar PIN"}"></label>
+      ${c.pinHash ? `<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="c-pin-off"> Remover o PIN</label>` : ""}
+      <button class="btn block" data-act="salvar-cfg">Salvar configurações</button>
+    </section>
+    ${instalar}${conta}
+    <p class="note" style="text-align:center">${MODE === "local" ? "Modo de teste: dados só neste aparelho." : "Dados salvos na nuvem. Tudo que muda aqui aparece na hora nos outros aparelhos."}</p>`;
+  return `${segAbas}
     <section class="card stack">
       <h2 style="font-size:17px">Cadastrar pessoa</h2>
       <label class="f">Nome completo<input class="inp" id="p-nome" placeholder="Ex.: Ricardo Alves de Souza"></label>
@@ -784,38 +857,7 @@ function vGerenciar() {
       ${inativos.length ? `<button class="link" data-act="ver-inativos" style="margin-top:8px">${ui.showInativos ? "Esconder" : "Ver"} desativados (${inativos.length})</button>
         ${ui.showInativos ? `<div class="list">${inativos.map(p => `<div class="row"><div class="grow"><div class="t" style="color:var(--muted)">${esc(p.nome)}</div><div class="s">${esc(p.cargo || p.tipo)}</div></div><button class="mini" data-act="reativar-p" data-id="${p.id}">reativar</button></div>`).join("")}</div>` : ""}` : ""}
     </section>
-
-    ${adm && MODE === "firebase" ? vAcessos() : ""}
-    ${adm ? vInventario() : ""}
-    ${adm ? `<section class="card stack">
-      <h2 style="font-size:17px">Quantos equipamentos a escola tem</h2>
-      <div class="grid2">
-        <label class="f">Notebooks<input class="inp" id="c-nb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.notebooks) || 0}"></label>
-        <label class="f">Tablets<input class="inp" id="c-tb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.tablets) || 0}"></label>
-      </div>
-      <p class="note" style="margin:0">Os códigos vão de NB-001 a NB-${String(Number(c.notebooks) || 0).padStart(3, "0")} e de TB-001 a TB-${String(Number(c.tablets) || 0).padStart(3, "0")}. Máximo de 200 de cada.</p>
-      <h2 style="font-size:17px;margin-top:6px">Horários das aulas</h2>
-      ${Object.entries(SEGS).map(([seg, l]) => `<div class="stack" style="gap:8px"><div class="step">${l}</div>${hor(seg)}<button class="mini" style="align-self:flex-start" data-act="h-add" data-seg="${seg}">+ adicionar aula</button></div>`).join("")}
-      <h2 style="font-size:17px;margin-top:6px">Contato</h2>
-      <label class="f">WhatsApp da escola<input class="inp" id="c-wa" inputmode="tel" placeholder="5511999998888" value="${esc(c.whatsapp)}"></label>
-      <p class="note" style="margin:0">Só números, com o código do país (55) e o DDD. O botão WhatsApp some se este campo ficar vazio.</p>
-      <h2 style="font-size:17px;margin-top:6px">Proteção</h2>
-      <label class="f">PIN para abrir Gerenciar (opcional)<input class="inp" id="c-pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="${c.pinHash ? "PIN ativo. Digite um novo para trocar" : "Deixe vazio para não usar PIN"}"></label>
-      ${c.pinHash ? `<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="c-pin-off"> Remover o PIN</label>` : ""}
-      <button class="btn block" data-act="salvar-cfg">Salvar configurações</button>
-    </section>` : ""}
-    ${HOSTED ? `<section class="card stack">
-      <h2 style="font-size:17px">Instalar em outro aparelho</h2>
-      <ol class="steps">
-        <li><b>Computador (Chrome ou Edge):</b> abra este endereço e clique no ícone de instalar no fim da barra de endereço, ou no menu ⋮ → “Instalar ParqueTEC”.</li>
-        <li><b>Android (Chrome):</b> menu ⋮ → “Instalar app” ou “Adicionar à tela inicial”.</li>
-        <li><b>iPhone (Safari):</b> Compartilhar → “Adicionar à Tela de Início”.</li>
-      </ol>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="app-url" readonly value="${esc(location.href.split("#")[0])}" style="flex:1;min-width:200px"><button class="btn ghost sm" data-act="copiar-url">Copiar endereço</button></div>
-      ${installEvt ? `<button class="btn block" data-act="instalar">Instalar neste aparelho</button>` : ""}
-    </section>` : ""}
-    ${MODE === "firebase" && AUTH ? `<section class="card" style="display:flex;align-items:center;gap:10px"><div class="grow" style="flex:1;min-width:0"><div class="note">Conectado como${adm ? " · coordenação" : ""}</div><b style="overflow-wrap:anywhere">${esc(AUTH.email || "")}</b></div><button class="mini" data-act="mudar-senha">Mudar senha</button><button class="btn ghost sm" data-act="sair">Sair</button></section>` : ""}
-    <p class="note" style="text-align:center">${MODE === "local" ? "Modo de teste: dados só neste aparelho." : "Dados salvos na nuvem. Tudo que muda aqui aparece na hora nos outros aparelhos."}</p>`;
+    ${adm ? "" : instalar + conta}`;
 }
 
 /* ---------- Inventário (modelo, patrimônio e local de cada equipamento) ---------- */
@@ -935,10 +977,23 @@ function personPicker(st, idp, opts = {}) {
     ${!hits.length && !st.q ? `<span class="note">Ninguém cadastrado ainda. Digite o nome para cadastrar.</span>` : ""}</div>`;
 }
 
+// Separa os primeiros códigos livres de cada modelo, nas quantidades pedidas.
+function separarPorModelo(st, quieto) {
+  const disp = disponiveis(st.tipo); st.sel.clear(); const faltou = [];
+  for (const [m, q] of Object.entries(st.qtds)) {
+    const n = parseInt(q) || 0; if (!n) continue;
+    const livres = disp.filter(c => inv(c).modelo === m);
+    livres.slice(0, n).forEach(c => st.sel.add(c));
+    if (livres.length < n) faltou.push(`${m}: só ${livres.length}`);
+  }
+  if (faltou.length && !quieto) toast("Não tem tudo disponível. " + faltou.join(" · "), 5000);
+  else if (faltou.length) st.aviso = "Nem todos os modelos agendados estão disponíveis agora. " + faltou.join(" · ");
+}
 function openRetirar(pref = {}) {
   const tipo = pref.tipo || ui.tipo;
-  const st = { live: true, tipo, pessoa: pref.pessoa || null, q: "", fin: pref.fin || "Aula regular", turma: pref.turma || "", obs: "", sel: new Set(), qtd: "", resId: pref.resId || null, codeQ: "", modelo: "" };
-  if (pref.qtd) { disponiveis(tipo).slice(0, pref.qtd).forEach(c => st.sel.add(c)); }
+  const st = { live: true, tipo, pessoa: pref.pessoa || null, q: "", fin: pref.fin || "Aula regular", turma: pref.turma || "", obs: "", sel: new Set(), qtd: "", resId: pref.resId || null, codeQ: "", modelo: "", qtds: { ...(pref.itens || {}) } };
+  if (pref.itens && Object.keys(pref.itens).length) separarPorModelo(st, true);
+  else if (pref.qtd) { disponiveis(tipo).slice(0, pref.qtd).forEach(c => st.sel.add(c)); }
   modal.open(mRetirar, st);
 }
 function mRetirar(st) {
@@ -960,18 +1015,20 @@ function mRetirar(st) {
       <label class="f">Turma ou sala (opcional)<input class="inp" id="rt-turma" value="${esc(st.turma)}" placeholder="Ex.: 2º A"></label>
     </div>
     <div class="step">3. Quais equipamentos <span style="text-transform:none;letter-spacing:0;font-weight:600">· ${disp.length} disponíveis</span></div>
-    ${disp.length ? `<div class="stepper">
+    ${st.aviso ? `<div class="sum" style="background:var(--stop-bg);color:var(--stop-ink)">${esc(st.aviso)}</div>` : ""}
+    ${disp.length ? `${ms.length ? `<div class="list">${ms.map((m, i) => qtdRow("rt-n-" + i, m, disp.filter(c => inv(c).modelo === m).length, "disponíveis", st.qtds[m])).join("")}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-act="rt-auto">Separar os códigos</button><button class="mini" data-act="rt-limpar" ${n ? "" : "disabled"}>Limpar</button></div>`
+    : `<div class="stepper">
       <span class="note">Separar</span>
       <input class="inp" id="rt-qtd" type="number" min="1" max="${disp.length}" inputmode="numeric" placeholder="qtd." value="${esc(st.qtd)}">
       <button class="mini" data-act="rt-auto">Escolher sozinho</button>
       <button class="mini" data-act="rt-limpar" ${n ? "" : "disabled"}>Limpar</button>
-    </div>
-    ${ms.length > 1 ? `<label class="f">Modelo<select class="inp" id="rt-modelo"><option value="">Todos os modelos</option>${ms.map(m => `<option ${st.modelo === m ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></label>` : ""}
+    </div>`}
     <input class="inp" id="rt-code" type="search" placeholder="Ou toque nos códigos abaixo. Buscar código ou patrimônio" value="${esc(st.codeQ)}">
     <div class="codes-wrap">${codeGrid(shown, c => `<button class="code" data-act="rt-code" data-v="${c}" title="${esc(dicaCod(c))}" aria-pressed="${st.sel.has(c)}">${c}</button>`)}</div>`
     : `<div class="sum">Nenhum ${TIPOS[st.tipo].um} disponível agora.</div>`}
     <label class="f">Observação (opcional)<input class="inp" id="rt-obs" value="${esc(st.obs)}" placeholder="Ex.: levou carregadores"></label>
-    <div class="sum">${n ? `<b>${n} ${n === 1 ? TIPOS[st.tipo].um : TIPOS[st.tipo].nome.toLowerCase()}</b>: ${[...st.sel].sort().join(", ")}` : "Nenhum equipamento escolhido."}${opNome() ? `<br>Autorizado por ${esc(opNome())}` : ""}</div>
+    <div class="sum">${n ? `<b>${esc(resumoCodes([...st.sel], st.tipo))}</b>${n > 1 && ms.length ? ` (${n} no total)` : ""}: ${[...st.sel].sort().join(", ")}` : "Nenhum equipamento escolhido."}${opNome() ? `<br>Autorizado por ${esc(opNome())}` : ""}</div>
     <button class="btn go block" data-act="rt-ok" ${n && st.pessoa ? "" : "disabled"}>Confirmar retirada</button>`;
 }
 
@@ -1001,18 +1058,26 @@ function mDevolver(st) {
     : `<div class="empty">Tudo devolvido. Nada pendente.</div>`}`;
 }
 
-function openAgendar(i) { modal.open(mAgendar, { live: true, aula: i, pessoa: null, q: "", qtd: "", turma: "", obs: "" }); }
+function qtdRow(id, modelo, livres, rotulo, valor) {
+  return `<div class="row"><div class="grow"><div class="t">${esc(modelo)}</div><div class="s">${livres} ${livres === 1 ? rotulo.replace("livres", "livre").replace("disponíveis", "disponível") : rotulo}</div></div>
+    <input class="inp" id="${id}" type="number" min="0" max="${livres}" inputmode="numeric" placeholder="0" value="${esc(valor || "")}" style="width:84px;text-align:center" ${livres ? "" : "disabled"} aria-label="Quantidade de ${esc(modelo)}"></div>`;
+}
+function openAgendar(i) { modal.open(mAgendar, { live: true, aula: i, pessoa: null, q: "", qtd: "", qtds: {}, turma: "", obs: "" }); }
 function mAgendar(st) {
   const a = (cfg().horarios[ui.seg] || [])[st.aula]; if (!a) return head("Agendar");
-  const s = stats(ui.tipo), livres = Math.max(0, s.parque - s.manut - reservadosSlot(ui.tipo, ui.seg, st.aula));
+  const L = livresSlot(ui.tipo, ui.seg, st.aula), livres = L.total, ms = modelosDe(ui.tipo);
   return `${head("Agendar")}
     <div class="sum"><b>${TIPOS[ui.tipo].nome}</b> · ${SEGS[ui.seg]} · ${esc(a.nome)} (${esc(a.ini)} às ${esc(a.fim)})<br>${esc(fmtLong.format(keyToDate(ui.date)))} · ${livres} livres</div>
     <div class="step">Para quem</div>
     ${personPicker(st, "ag-q", { soProf: true })}
-    <div class="grid2">
+    ${ms.length ? `<div class="step">Quantos de cada modelo</div>
+    <div class="list">${ms.map((m, i) => qtdRow("ag-n-" + i, m, L.porModelo[m], "livres nessa aula", st.qtds[m])).join("")}</div>
+    <div class="sum">Total: <b>${somaQ(st.qtds)}</b> de ${livres} livres nessa aula</div>
+    <label class="f">Turma<input class="inp" id="ag-turma" value="${esc(st.turma)}" placeholder="Ex.: 3º B"></label>`
+    : `<div class="grid2">
       <label class="f">Quantidade<input class="inp" id="ag-qtd" type="number" min="1" max="${livres}" inputmode="numeric" value="${esc(st.qtd)}" placeholder="até ${livres}"></label>
       <label class="f">Turma<input class="inp" id="ag-turma" value="${esc(st.turma)}" placeholder="Ex.: 3º B"></label>
-    </div>
+    </div>`}
     <label class="f">Observação (opcional)<input class="inp" id="ag-obs" value="${esc(st.obs)}" placeholder="Ex.: atividade de pesquisa"></label>
     <button class="btn go block" data-act="ag-ok">Confirmar agendamento</button>`;
 }
@@ -1090,9 +1155,9 @@ const acts = {
   async "pp-novo"() { const st = modal.state; const p = await novaPessoa(st.q, { tipo: "Profissional" }); if (p && modal.state === st) { st.pessoa = p; modal.draw(); toast("Pessoa cadastrada"); } },
 
   /* retirar */
-  "rt-tipo"(t) { modal.state.tipo = t.dataset.v; modal.state.sel.clear(); modal.draw(); },
+  "rt-tipo"(t) { modal.state.tipo = t.dataset.v; modal.state.sel.clear(); modal.state.qtds = {}; modal.state.aviso = ""; modal.draw(); },
   "rt-code"(t) { const s = modal.state.sel, c = t.dataset.v; s.has(c) ? s.delete(c) : s.add(c); modal.draw(); },
-  "rt-auto"() { const st = modal.state, n = parseInt(st.qtd) || 0; if (n < 1) return toast("Digite a quantidade primeiro."); st.sel.clear(); disponiveis(st.tipo).filter(c => !st.modelo || inv(c).modelo === st.modelo).slice(0, n).forEach(c => st.sel.add(c)); if (st.sel.size < n) toast(`Só há ${st.sel.size} disponíveis.`); modal.draw(); },
+  "rt-auto"() { const st = modal.state; st.aviso = ""; if (modelosDe(st.tipo).length) { if (!somaQ(st.qtds)) return toast("Digite quantos de cada modelo."); separarPorModelo(st); return modal.draw(); } const n = parseInt(st.qtd) || 0; if (n < 1) return toast("Digite a quantidade primeiro."); st.sel.clear(); disponiveis(st.tipo).filter(c => !st.modelo || inv(c).modelo === st.modelo).slice(0, n).forEach(c => st.sel.add(c)); if (st.sel.size < n) toast(`Só há ${st.sel.size} disponíveis.`); modal.draw(); },
   "rt-limpar"() { modal.state.sel.clear(); modal.draw(); },
   async "rt-ok"(t) {
     const st = modal.state; if (!st.pessoa || !st.sel.size) return;
@@ -1112,17 +1177,22 @@ const acts = {
   /* agenda */
   agendar(t) { openAgendar(Number(t.dataset.i)); },
   async "ag-ok"(t) {
-    const st = modal.state, qtd = parseInt(st.qtd) || 0;
-    const s = stats(ui.tipo), livres = s.parque - s.manut - reservadosSlot(ui.tipo, ui.seg, st.aula);
+    const st = modal.state, ms = modelosDe(ui.tipo), L = livresSlot(ui.tipo, ui.seg, st.aula), livres = L.total;
+    let itens = null, qtd = parseInt(st.qtd) || 0;
     if (!st.pessoa) return toast("Escolha para quem é o agendamento.");
-    if (qtd < 1) return toast("Digite a quantidade.");
+    if (ms.length) {
+      itens = {};
+      for (const m of ms) { const n = parseInt(st.qtds[m]) || 0; if (n > L.porModelo[m]) return toast(`Só há ${L.porModelo[m]} ${m} livres nessa aula.`); if (n > 0) itens[m] = n; }
+      qtd = somaQ(itens);
+    }
+    if (qtd < 1) return toast(ms.length ? "Digite quantos de cada modelo." : "Digite a quantidade.");
     if (qtd > livres) return toast(`Só há ${livres} livres nesse horário.`);
     t.disabled = true;
-    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, aulaNome: cfg().horarios[ui.seg][st.aula].nome, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() };
+    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, aulaNome: cfg().horarios[ui.seg][st.aula].nome, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, ...(itens ? { itens } : {}), turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() };
     if (await write(() => DB.collection("reservas").doc().set(r), "Agendado")) modal.close(); else t.disabled = false;
   },
   async "cancelar-res"(t) { const k = "res:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("reservas/" + t.dataset.id).delete(), "Agendamento cancelado"); },
-  "retirar-res"(t) { const r = S.reservas.find(x => x.id === t.dataset.id); if (!r) return; openRetirar({ tipo: r.tipo, pessoa: pessoa(r.pessoaId) || { id: r.pessoaId, nome: r.pessoaNome }, fin: "Agendamento", turma: r.turma, qtd: r.qtd, resId: r.id }); },
+  "retirar-res"(t) { const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return; openRetirar({ tipo: r.tipo, pessoa: pessoa(r.pessoaId) || { id: r.pessoaId, nome: r.pessoaNome }, fin: "Agendamento", turma: r.turma, qtd: r.qtd, itens: r.itens, resId: r.id }); },
 
   /* operador */
   "op-ok"() { const p = modal.state.pessoa; if (!p) return; operador = { id: p.id, nome: p.nome, cargo: p.cargo || "" }; store.set("operador", operador); modal.close(); render(); toast(`Olá, ${p.nome.split(" ")[0]}!`); },
@@ -1147,6 +1217,7 @@ const acts = {
 
   /* gerenciar */
   async desbloquear() { const v = $("#pin-in").value; if (await sha(v) === cfg().pinHash) { ui.unlocked = true; render(); } else toast("PIN errado."); },
+  "ger-aba"(t) { ui.gerAba = t.dataset.v; ui.armed = null; render(); window.scrollTo(0, 0); },
   "ger-tipo"(t) { ui.gerTipo = t.dataset.v; ui.gerQ = ""; render(); },
   parar(t) { openParar(t.dataset.v); },
   "pr-estado"(t) { modal.state.motivo = $("#pr-motivo").value; modal.state.estado = t.dataset.v; modal.draw(); },
@@ -1301,6 +1372,8 @@ document.addEventListener("input", (ev) => {
   const pp = { "rt-q": 1, "ag-q": 1, "op-q": 1 };
   if (pp[id] && st) { st.q = t.value; return modal.draw(); }
   if (id === "rt-code" && st) { st.codeQ = t.value; return modal.draw(); }
+  let mm;
+  if (st && (mm = id.match(/^(rt|ag)-n-(\d+)$/))) { st.qtds[modelosDe(mm[1] === "rt" ? st.tipo : ui.tipo)[Number(mm[2])]] = t.value; if (mm[1] === "ag") modal.draw(); return; }
   if (id === "dv-q" && st) { st.q = t.value; return modal.draw(); }
   if (st) { const map = { "rt-turma": "turma", "rt-obs": "obs", "rt-qtd": "qtd", "ag-qtd": "qtd", "ag-turma": "turma", "ag-obs": "obs", "pr-motivo": "motivo" }; if (map[id]) st[map[id]] = t.value; }
   if (id === "hist-q") { ui.histQ = t.value; render(); }
@@ -1327,7 +1400,7 @@ function toast(msg, ms = 2800) {
 }
 
 /* ---------- Início ---------- */
-function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {} }); ui.semAcesso = false; ui.importPrev = null; }
+function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [] }); ui.semAcesso = false; ui.importPrev = null; }
 async function boot() {
   const conf = HOSTED && window.PARQUETEC_FIREBASE;
   if (HOSTED) {
@@ -1361,7 +1434,7 @@ async function boot() {
     if (cloud) { DB = cloud; MODE = "claude"; } else { DB = localDB(); MODE = "local"; }
     subscribeAll();
   }
-  setInterval(() => { const k = dayKey(); if (k !== boot.day) { if (ui.date === boot.day) { ui.date = k; subscribeReservas(); } boot.day = k; render(); } }, 60000);
+  setInterval(() => { const k = dayKey(); if (k !== boot.day) { if (Object.keys(unsub).length) { if (ui.date === boot.day) { ui.date = k; subscribeReservas(); } subscribeResHoje(); } boot.day = k; render(); } }, 60000);
   boot.day = dayKey();
 }
 render();
