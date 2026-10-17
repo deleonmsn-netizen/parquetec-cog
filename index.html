@@ -15,6 +15,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <script src="config.js"></script>
+<script src="inventario-cog.js"></script>
 <style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <!--/pwa--><link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -161,6 +162,10 @@ textarea.inp{min-height:84px;resize:vertical}
 .code.inuse{background:var(--use-bg);color:var(--use-ink);border-color:transparent}
 .code.manut{background:var(--stop-bg);color:var(--stop-ink);border-color:transparent}
 .code.baixa{background:color-mix(in srgb,var(--muted) 28%,var(--surface));color:var(--muted);text-decoration:line-through;border-color:transparent}
+.grp{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:700;color:var(--muted);margin:10px 0 5px}
+.grp:first-child{margin-top:0}
+.codes-wrap{max-height:340px;overflow-y:auto;padding:2px}
+.codes-wrap .codes{max-height:none;overflow:visible;padding:0}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 
@@ -218,6 +223,21 @@ nav.tabs .pip{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;heig
 .plate{background:var(--plate);border-radius:var(--r);padding:14px;display:grid;place-items:center}
 .plate img{width:200px;height:auto}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.imp{display:flex;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:var(--r-sm);padding:12px}
+#print{display:none}
+@media print{
+  @page{size:A4;margin:10mm}
+  :root{padding:0!important}
+  body{background:#fff!important}
+  body::before{display:none!important}
+  body>*:not(#print){display:none!important}
+  #print{display:grid!important;grid-template-columns:repeat(3,1fr)}
+  .etq{display:flex;align-items:center;gap:3mm;height:27mm;padding:2mm 3mm;border:1px dashed #999;break-inside:avoid;color:#111;font-family:var(--f-body)}
+  .etq img{width:15mm;height:15mm;object-fit:contain;flex:none}
+  .etq b{display:block;font-family:var(--f-display);font-size:19pt;line-height:1}
+  .etq span{display:block;font-size:8pt;line-height:1.25}
+  .etq small{display:block;font-size:6.5pt;color:#555;letter-spacing:.06em;text-transform:uppercase;margin-top:1mm}
+}
 </style>
 <!--pwa--></head>
 <body>
@@ -383,7 +403,7 @@ let DB = null, MODE = "local", downloads = null, FB = null, AUTH = null, install
 const HOSTED = !(window.claude && typeof window.claude.use === "function");
 const STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [] };
+const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {} };
 const CONF = window.PARQUETEC_FIREBASE || {};
 const meuEmail = () => String(AUTH && AUTH.email || "").toLowerCase();
 const souDono = () => !!(CONF.dono && meuEmail() === String(CONF.dono).toLowerCase());
@@ -423,6 +443,7 @@ function subscribeAll() {
   listen("pessoas", DB.collection("pessoas"), s => { S.pessoas = docsOf(s).sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1); });
   listen("abertos", DB.collection("emprestimos").where("aberto", "==", true), s => { S.abertos = docsOf(s).sort((a, b) => b.retiradoEm - a.retiradoEm); });
   listen("parados", DB.collection("parados"), s => { S.parados = docsOf(s); });
+  listen("inv", DB.doc("config/inventario"), s => { S.inv = s.exists ? (s.data().itens || {}) : {}; });
   listen("recados", DB.collection("recados").orderBy("em", "desc").limit(60), s => { S.recados = docsOf(s); });
   subscribeHist(); subscribeReservas();
   if (MODE === "firebase") listen("acessos", DB.collection("acessos"), s => {
@@ -469,6 +490,17 @@ function stats(t) {
 function disponiveis(t) { const uso = emUsoMap(), par = paradosMap(); return codesFor(t).filter(c => !uso.has(c) && !par.has(c)); }
 function pendentes(e) { return (e.codes || []).filter(c => !(e.devolvidos || {})[c]); }
 const pessoa = (id) => S.pessoas.find(p => p.id === id);
+const inv = (c) => S.inv[c] || {};
+const buscaCod = (c) => norm([c, inv(c).modelo, inv(c).patrimonio, inv(c).local].join(" ")).replace(/\s/g, "");
+const dicaCod = (c) => { const i = inv(c); return [i.modelo, i.patrimonio && "Patrimônio " + i.patrimonio, i.local].filter(Boolean).join(" · "); };
+// Códigos agrupados por modelo (quando o inventário foi importado).
+function codeGrid(codes, btn) {
+  const g = new Map();
+  for (const c of codes) { const m = inv(c).modelo || ""; if (!g.has(m)) g.set(m, []); g.get(m).push(c); }
+  if (g.size === 1 && g.has("")) return `<div class="codes">${codes.map(btn).join("")}</div>`;
+  return [...g].map(([m, l]) => `<div class="grp"><span>${esc(m || "Sem modelo")}</span><span>${l.length}</span></div><div class="codes">${l.map(btn).join("")}</div>`).join("");
+}
+function modelosDe(t) { return [...new Set(codesFor(t).map(c => inv(c).modelo).filter(Boolean))]; }
 const opNome = () => operador ? operador.nome : "";
 
 /* ---------- Renderização ---------- */
@@ -535,6 +567,8 @@ function setupCard() {
       <label class="f">Tablets<input class="inp" id="setup-tb" type="number" min="0" max="200" inputmode="numeric" placeholder="ex.: 54"></label>
     </div>
     <button class="btn block" data-act="setup">Salvar e começar</button>
+    <div class="step" style="text-align:center">ou</div>
+    ${blocoImportar()}
   </div>`;
 }
 
@@ -581,6 +615,17 @@ function installCard() {
   return "";
 }
 
+function porModelo(t) {
+  const ms = modelosDe(t); if (!ms.length) return "";
+  const uso = emUsoMap(), par = paradosMap();
+  const rows = ms.map(m => {
+    const cs = codesFor(t).filter(c => inv(c).modelo === m && (par.get(c) || {}).estado !== "baixa");
+    const livres = cs.filter(c => !uso.has(c) && !par.has(c)).length;
+    return `<div class="row"><div class="grow t">${esc(m)}</div><span class="note" style="white-space:nowrap"><b style="color:var(--ink)">${livres}</b> de ${cs.length} disponíveis</span></div>`;
+  }).join("");
+  return `<section class="card" style="padding-block:6px"><div class="list">${rows}</div></section>`;
+}
+
 function vPainel() {
   if (!S.config) return setupCard();
   const st = stats(ui.tipo);
@@ -595,7 +640,7 @@ function vPainel() {
       return `<div class="row"><div class="grow">
           <div class="t">${esc(e.pessoaNome)} ${velho ? `<span class="badge late">desde ${esc(dayLabel(dayKey(new Date(e.retiradoEm)))[0] || fmtLong.format(new Date(e.retiradoEm)))}</span>` : ""}</div>
           <div class="s">${esc(e.finalidade)}${e.turma ? " · " + esc(e.turma) : ""} · retirou às ${hhmm(e.retiradoEm)} · ${pend.length} ${pend.length === 1 ? TIPOS[e.tipo].um : TIPOS[e.tipo].nome.toLowerCase()}</div>
-          <div class="chips">${pend.map(c => `<span class="chip">${c}</span>`).join("")}</div>
+          <div class="chips">${pend.map(c => `<span class="chip" title="${esc(dicaCod(c))}">${c}</span>`).join("")}</div>
         </div><button class="btn back sm" data-act="devolver" data-id="${e.id}">Devolver</button></div>`;
     }).join("")}</div>`;
   }
@@ -608,6 +653,7 @@ function vPainel() {
       <div class="tile t-park"><span class="lbl">Total no parque</span><span class="num">${st.parque}</span></div>
     </div>
     <div class="note">Em manutenção: ${st.manut} · Baixados: ${st.baixa} (fora do parque) · Cadastrados: ${st.total}</div>
+    ${porModelo(ui.tipo)}
     <section class="card"><div class="sec-h"><h2>Em uso agora</h2>${abertos.length ? `<span class="note">${abertos.length} ${abertos.length === 1 ? "retirada" : "retiradas"}</span>` : ""}</div>${lista}</section>`;
 }
 
@@ -690,7 +736,7 @@ function vGerenciar() {
   if (!S.config) return setupCard();
   const adm = isAdmin();
   const t = ui.gerTipo, uso = emUsoMap(), par = paradosMap(), q = norm(ui.gerQ);
-  const codes = codesFor(t).filter(c => !q || norm(c).includes(q.replace(/\s/g, "")));
+  const codes = codesFor(t).filter(c => !q || buscaCod(c).includes(q.replace(/\s/g, "")));
   const manut = S.parados.filter(p => p.estado !== "baixa" && p.tipo === t).sort((a, b) => a.id < b.id ? -1 : 1);
   const baixa = S.parados.filter(p => p.estado === "baixa" && p.tipo === t).sort((a, b) => a.id < b.id ? -1 : 1);
   const parList = (arr) => arr.map(p => `<div class="row"><div class="grow"><div class="t">${p.id}</div><div class="s">${esc(p.motivo || "sem motivo")} · ${esc(fmtLong.format(new Date(p.em)))}${p.por ? " · " + esc(p.por) : ""}</div></div><button class="mini" data-act="desfazer" data-id="${p.id}">Voltar ao parque</button></div>`).join("");
@@ -704,8 +750,8 @@ function vGerenciar() {
   return `${adm ? `<section class="card stack">
       <div><h2 style="font-size:17px">Manutenção e baixa</h2><p class="note" style="margin:4px 0 0">Toque no código para mandar o equipamento para manutenção ou dar baixa. Se ele estiver em uso, a devolução é registrada sozinha.</p></div>
       ${tipoSeg("", t, "ger-tipo")}
-      <input class="inp" id="ger-q" type="search" placeholder="Buscar código, ex.: ${t}-004" value="${esc(ui.gerQ)}">
-      <div class="codes">${codes.map(cd => { const p = par.get(cd); const cls = p ? (p.estado === "baixa" ? "baixa" : "manut") : uso.has(cd) ? "inuse" : ""; return `<button class="code ${cls}" data-act="parar" data-v="${cd}">${cd}</button>`; }).join("") || `<span class="note">Nenhum código.</span>`}</div>
+      <input class="inp" id="ger-q" type="search" placeholder="Buscar código, modelo ou patrimônio" value="${esc(ui.gerQ)}">
+      <div class="codes-wrap">${codes.length ? codeGrid(codes, cd => { const p = par.get(cd); const cls = p ? (p.estado === "baixa" ? "baixa" : "manut") : uso.has(cd) ? "inuse" : ""; return `<button class="code ${cls}" data-act="parar" data-v="${cd}" title="${esc(dicaCod(cd))}">${cd}</button>`; }) : `<span class="note">Nenhum código.</span>`}</div>
       <div class="legend"><span><i style="background:var(--surface);border:1px solid var(--line)"></i>No parque</span><span><i style="background:var(--use-bg)"></i>Em uso</span><span><i style="background:var(--stop-bg)"></i>Manutenção</span><span><i style="background:color-mix(in srgb,var(--muted) 28%,var(--surface))"></i>Baixado</span></div>
       ${manut.length ? `<div><div class="step">Em manutenção (${manut.length})</div><div class="list">${parList(manut)}</div></div>` : ""}
       ${baixa.length ? `<div><div class="step">Baixados (${baixa.length})</div><p class="note" style="margin:2px 0 0">Fora do parque. Continuam no histórico.</p><div class="list">${parList(baixa)}</div></div>` : ""}
@@ -740,6 +786,7 @@ function vGerenciar() {
     </section>
 
     ${adm && MODE === "firebase" ? vAcessos() : ""}
+    ${adm ? vInventario() : ""}
     ${adm ? `<section class="card stack">
       <h2 style="font-size:17px">Quantos equipamentos a escola tem</h2>
       <div class="grid2">
@@ -769,6 +816,73 @@ function vGerenciar() {
     </section>` : ""}
     ${MODE === "firebase" && AUTH ? `<section class="card" style="display:flex;align-items:center;gap:10px"><div class="grow" style="flex:1;min-width:0"><div class="note">Conectado como${adm ? " · coordenação" : ""}</div><b style="overflow-wrap:anywhere">${esc(AUTH.email || "")}</b></div><button class="mini" data-act="mudar-senha">Mudar senha</button><button class="btn ghost sm" data-act="sair">Sair</button></section>` : ""}
     <p class="note" style="text-align:center">${MODE === "local" ? "Modo de teste: dados só neste aparelho." : "Dados salvos na nuvem. Tudo que muda aqui aparece na hora nos outros aparelhos."}</p>`;
+}
+
+/* ---------- Inventário (modelo, patrimônio e local de cada equipamento) ---------- */
+function parseCSV(t) {
+  t = t.replace(/^\ufeff/, "");
+  const first = t.split(/\r?\n/)[0] || "", d = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ";" : ",";
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === d) { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && t[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim()));
+}
+function lerInventario(text) {
+  const rows = parseCSV(text);
+  const H = (rows[0] || []).map(norm), col = (...ns) => H.findIndex(h => ns.some(n => h.includes(n)));
+  const iC = col("codigo"), iM = col("modelo"), iL = col("lote"), iP = col("patrimonio"), iLo = col("local"), iS = col("situacao", "status"), iMo = col("motivo", "observ");
+  let iMa = col("marca"); if (iMa === iM) iMa = -1;
+  if (iC < 0) throw new Error("A planilha precisa de uma coluna “Código” (NB-001, NB-002…).");
+  const itens = {}, parar = []; let nb = 0, tb = 0;
+  for (const r of rows.slice(1)) {
+    const m = String(r[iC] || "").trim().toUpperCase().replace(/\s/g, "").match(/^(NB|TB)-?(\d{1,3})$/);
+    if (!m) continue;
+    const n = Number(m[2]); if (n < 1 || n > 200) continue;
+    const c = `${m[1]}-${String(n).padStart(3, "0")}`, g = (i) => i >= 0 ? String(r[i] ?? "").trim() : "";
+    if (m[1] === "NB") nb = Math.max(nb, n); else tb = Math.max(tb, n);
+    itens[c] = { modelo: [g(iMa), g(iM)].filter(Boolean).join(" "), lote: g(iL), patrimonio: g(iP), local: g(iLo) };
+    const sit = norm(g(iS));
+    if (sit.startsWith("baixa") || sit.includes("inserv")) parar.push({ code: c, estado: "baixa", motivo: g(iMo) });
+    else if (sit.startsWith("manut")) parar.push({ code: c, estado: "manut", motivo: g(iMo) });
+  }
+  const total = Object.keys(itens).length;
+  if (!total) throw new Error("Não achei nenhum código NB-… ou TB-… na planilha.");
+  return { itens, parar, nb, tb, total, modelos: new Set(Object.values(itens).map(i => i.modelo).filter(Boolean)).size };
+}
+function lerArquivoInventario(file) {
+  const r = new FileReader();
+  r.onload = () => { try { ui.importPrev = lerInventario(String(r.result)); render(); } catch (e) { toast(e.message || "Não consegui ler essa planilha.", 6000); } };
+  r.onerror = () => toast("Não consegui abrir o arquivo.");
+  r.readAsText(file, "utf-8");
+}
+function blocoImportar() {
+  const p = ui.importPrev, pronto = window.PARQUETEC_INVENTARIO;
+  if (p) {
+    const baixa = p.parar.filter(x => x.estado === "baixa").length, manut = p.parar.length - baixa;
+    return `<div class="imp"><b>Conferir antes de importar</b>
+      <div class="note" style="color:var(--ink)">${p.total} equipamentos${p.nb ? ` · ${p.nb} notebooks` : ""}${p.tb ? ` · ${p.tb} tablets` : ""} · ${p.modelos} modelos${manut ? ` · ${manut} em manutenção` : ""}${baixa ? ` · ${baixa} em baixa` : ""}</div>
+      <div class="note">Os dados de modelo, patrimônio e local de cada código serão trocados pelos da planilha.</div>
+      <div style="display:flex;gap:8px"><button class="btn" data-act="inv-ok">Importar</button><button class="btn ghost" data-act="inv-cancelar">Cancelar</button></div></div>`;
+  }
+  return `${pronto && !Object.keys(S.inv).length ? `<button class="btn go block" data-act="inv-cog">Carregar o inventário do COG (${pronto.total} notebooks)</button>` : ""}
+    <div class="imp"><label class="btn ghost block" for="inv-file" tabindex="0">Importar planilha do inventário (CSV)</label>
+    <input type="file" id="inv-file" accept=".csv,text/csv,text/plain" hidden>
+    <span class="note">Colunas: Código; Modelo; Nº no lote; Patrimônio; Local; Situação; Motivo. No Excel, use “Salvar como → CSV”.</span></div>`;
+}
+function vInventario() {
+  const com = Object.keys(S.inv).length;
+  return `<section class="card stack">
+    <div><h2 style="font-size:17px">Inventário</h2><p class="note" style="margin:4px 0 0">${com ? `${com} equipamentos com modelo e patrimônio. Toque num código acima para corrigir os dados dele.` : "Importe a planilha do inventário para guardar o modelo, o patrimônio e o local de cada equipamento."}</p></div>
+    ${blocoImportar()}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${downloads ? `<button class="btn ghost sm" data-act="inv-baixar">Baixar inventário</button>` : ""}${HOSTED ? `<button class="btn ghost sm" data-act="etiquetas">Imprimir etiquetas com o logo</button>` : ""}</div>
+  </section>`;
 }
 
 function vAcessos() {
@@ -823,7 +937,7 @@ function personPicker(st, idp, opts = {}) {
 
 function openRetirar(pref = {}) {
   const tipo = pref.tipo || ui.tipo;
-  const st = { live: true, tipo, pessoa: pref.pessoa || null, q: "", fin: pref.fin || "Aula regular", turma: pref.turma || "", obs: "", sel: new Set(), qtd: "", resId: pref.resId || null, codeQ: "" };
+  const st = { live: true, tipo, pessoa: pref.pessoa || null, q: "", fin: pref.fin || "Aula regular", turma: pref.turma || "", obs: "", sel: new Set(), qtd: "", resId: pref.resId || null, codeQ: "", modelo: "" };
   if (pref.qtd) { disponiveis(tipo).slice(0, pref.qtd).forEach(c => st.sel.add(c)); }
   modal.open(mRetirar, st);
 }
@@ -831,7 +945,10 @@ function mRetirar(st) {
   const disp = disponiveis(st.tipo);
   for (const c of [...st.sel]) if (!disp.includes(c)) st.sel.delete(c);
   const q = norm(st.codeQ).replace(/\s/g, "");
-  const shown = disp.filter(c => !q || norm(c).includes(q));
+  const ms = modelosDe(st.tipo);
+  if (st.modelo && !ms.includes(st.modelo)) st.modelo = "";
+  const dispM = st.modelo ? disp.filter(c => inv(c).modelo === st.modelo) : disp;
+  const shown = dispM.filter(c => !q || buscaCod(c).includes(q));
   const n = st.sel.size;
   return `${head("Retirar")}
     ${tipoSeg("rt", st.tipo, "rt-tipo")}
@@ -849,8 +966,9 @@ function mRetirar(st) {
       <button class="mini" data-act="rt-auto">Escolher sozinho</button>
       <button class="mini" data-act="rt-limpar" ${n ? "" : "disabled"}>Limpar</button>
     </div>
-    <input class="inp" id="rt-code" type="search" placeholder="Ou toque nos códigos abaixo. Buscar: ex. 014" value="${esc(st.codeQ)}">
-    <div class="codes">${shown.map(c => `<button class="code" data-act="rt-code" data-v="${c}" aria-pressed="${st.sel.has(c)}">${c}</button>`).join("")}</div>`
+    ${ms.length > 1 ? `<label class="f">Modelo<select class="inp" id="rt-modelo"><option value="">Todos os modelos</option>${ms.map(m => `<option ${st.modelo === m ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></label>` : ""}
+    <input class="inp" id="rt-code" type="search" placeholder="Ou toque nos códigos abaixo. Buscar código ou patrimônio" value="${esc(st.codeQ)}">
+    <div class="codes-wrap">${codeGrid(shown, c => `<button class="code" data-act="rt-code" data-v="${c}" title="${esc(dicaCod(c))}" aria-pressed="${st.sel.has(c)}">${c}</button>`)}</div>`
     : `<div class="sum">Nenhum ${TIPOS[st.tipo].um} disponível agora.</div>`}
     <label class="f">Observação (opcional)<input class="inp" id="rt-obs" value="${esc(st.obs)}" placeholder="Ex.: levou carregadores"></label>
     <div class="sum">${n ? `<b>${n} ${n === 1 ? TIPOS[st.tipo].um : TIPOS[st.tipo].nome.toLowerCase()}</b>: ${[...st.sel].sort().join(", ")}` : "Nenhum equipamento escolhido."}${opNome() ? `<br>Autorizado por ${esc(opNome())}` : ""}</div>
@@ -907,10 +1025,16 @@ function mOperador(st) {
     <button class="btn block" data-act="op-ok" ${st.pessoa ? "" : "disabled"}>Confirmar</button>`;
 }
 
-function openParar(code) { const p = paradosMap().get(code); modal.open(mParar, { code, estado: p ? p.estado : "manut", motivo: p ? p.motivo || "" : "", atual: p || null }); }
+function openParar(code) { const p = paradosMap().get(code), i = inv(code); modal.open(mParar, { code, estado: p ? p.estado : "manut", motivo: p ? p.motivo || "" : "", atual: p || null, modelo: i.modelo || "", patrimonio: i.patrimonio || "", local: i.local || "", lote: i.lote || "" }); }
 function mParar(st) {
   const e = emUsoMap().get(st.code);
-  return `${head("Parar " + st.code)}
+  return `${head(st.code)}
+    <div class="grid2">
+      <label class="f">Modelo<input class="inp" id="pr-modelo" value="${esc(st.modelo)}" placeholder="Ex.: Positivo N1110"></label>
+      <label class="f">Patrimônio<input class="inp" id="pr-pat" value="${esc(st.patrimonio)}" placeholder="aguardando nº"></label>
+    </div>
+    <div style="display:flex;gap:10px;align-items:end"><label class="f" style="flex:1">Local<input class="inp" id="pr-local" value="${esc(st.local)}" placeholder="Ex.: Sala 6"></label><button class="btn ghost" data-act="inv-salvar">Salvar dados</button></div>
+    <div class="step">Mandar para manutenção ou dar baixa</div>
     ${st.atual ? `<div class="sum">Hoje: <b>${st.atual.estado === "baixa" ? "baixado" : "em manutenção"}</b>${st.atual.motivo ? " · " + esc(st.atual.motivo) : ""}</div>` : ""}
     ${e ? `<div class="sum">Está com <b>${esc(e.pessoaNome)}</b>. Ao registrar, a devolução é feita sozinha.</div>` : ""}
     <div class="seg" role="group"><button data-act="pr-estado" data-v="manut" aria-pressed="${st.estado === "manut"}">Manutenção</button><button data-act="pr-estado" data-v="baixa" aria-pressed="${st.estado === "baixa"}">Baixa</button></div>
@@ -968,7 +1092,7 @@ const acts = {
   /* retirar */
   "rt-tipo"(t) { modal.state.tipo = t.dataset.v; modal.state.sel.clear(); modal.draw(); },
   "rt-code"(t) { const s = modal.state.sel, c = t.dataset.v; s.has(c) ? s.delete(c) : s.add(c); modal.draw(); },
-  "rt-auto"() { const st = modal.state, n = parseInt(st.qtd) || 0; if (n < 1) return toast("Digite a quantidade primeiro."); st.sel.clear(); disponiveis(st.tipo).slice(0, n).forEach(c => st.sel.add(c)); if (st.sel.size < n) toast(`Só há ${st.sel.size} disponíveis.`); modal.draw(); },
+  "rt-auto"() { const st = modal.state, n = parseInt(st.qtd) || 0; if (n < 1) return toast("Digite a quantidade primeiro."); st.sel.clear(); disponiveis(st.tipo).filter(c => !st.modelo || inv(c).modelo === st.modelo).slice(0, n).forEach(c => st.sel.add(c)); if (st.sel.size < n) toast(`Só há ${st.sel.size} disponíveis.`); modal.draw(); },
   "rt-limpar"() { modal.state.sel.clear(); modal.draw(); },
   async "rt-ok"(t) {
     const st = modal.state; if (!st.pessoa || !st.sel.size) return;
@@ -1011,10 +1135,10 @@ const acts = {
   /* histórico */
   "mais-hist"() { ui.histLimit += 300; subscribeHist(); },
   async planilha() {
-    const rows = [["Data", "Hora da retirada", "Tipo", "Equipamento", "Pessoa", "Cargo/turma da pessoa", "Turma/sala", "Finalidade", "Autorizado por", "Situação", "Devolvido em", "Recebido por", "Observação"]];
+    const rows = [["Data", "Hora da retirada", "Tipo", "Equipamento", "Modelo", "Patrimônio", "Pessoa", "Cargo/turma da pessoa", "Turma/sala", "Finalidade", "Autorizado por", "Situação", "Devolvido em", "Recebido por", "Observação"]];
     for (const e of S.hist.slice().reverse()) for (const c of e.codes || []) {
       const d = (e.devolvidos || {})[c], dt = new Date(e.retiradoEm);
-      rows.push([fmtLong.format(dt), hhmm(e.retiradoEm), TIPOS[e.tipo] ? TIPOS[e.tipo].um : e.tipo, c, e.pessoaNome, e.pessoaCargo || "", e.turma || "", e.finalidade, e.operador || "", d ? "devolvido" : "em uso", d ? `${dayKey(new Date(d.em)).split("-").reverse().join("/")} ${hhmm(d.em)}` : "", d ? d.por || "" : "", [e.obs, d && d.nota].filter(Boolean).join(" · ")]);
+      rows.push([fmtLong.format(dt), hhmm(e.retiradoEm), TIPOS[e.tipo] ? TIPOS[e.tipo].um : e.tipo, c, inv(c).modelo || "", inv(c).patrimonio || "", e.pessoaNome, e.pessoaCargo || "", e.turma || "", e.finalidade, e.operador || "", d ? "devolvido" : "em uso", d ? `${dayKey(new Date(d.em)).split("-").reverse().join("/")} ${hhmm(d.em)}` : "", d ? d.por || "" : "", [e.obs, d && d.nota].filter(Boolean).join(" · ")]);
     }
     const csv = "﻿" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
     try { await downloads.save({ filename: `historico-equipamentos-${dayKey()}.csv`, data: csv }); toast("Planilha salva"); }
@@ -1026,6 +1150,47 @@ const acts = {
   "ger-tipo"(t) { ui.gerTipo = t.dataset.v; ui.gerQ = ""; render(); },
   parar(t) { openParar(t.dataset.v); },
   "pr-estado"(t) { modal.state.motivo = $("#pr-motivo").value; modal.state.estado = t.dataset.v; modal.draw(); },
+  async "inv-salvar"(t) {
+    const st = modal.state, item = { modelo: $("#pr-modelo").value.trim(), patrimonio: $("#pr-pat").value.trim(), local: $("#pr-local").value.trim(), lote: st.lote || "" };
+    Object.assign(st, item); t.disabled = true;
+    const ref = DB.doc("config/inventario");
+    const ok = await write(() => Object.keys(S.inv).length ? ref.update({ itens: { [st.code]: item } }) : ref.set({ itens: { [st.code]: item } }), `Dados do ${st.code} salvos`);
+    t.disabled = false; if (ok) modal.close();
+  },
+  "inv-cancelar"() { ui.importPrev = null; render(); },
+  "inv-cog"() { const p = window.PARQUETEC_INVENTARIO; if (!p) return; ui.importPrev = JSON.parse(JSON.stringify(p)); render(); },
+  async "inv-ok"(t) {
+    const p = ui.importPrev; if (!p) return;
+    t.disabled = true;
+    const c = JSON.parse(JSON.stringify(cfg())); delete c.id;
+    if (p.nb) c.notebooks = p.nb;
+    if (p.tb) c.tablets = p.tb;
+    if (!S.config) c.criadoEm = Date.now();
+    if (!(await write(() => DB.doc("config/main").set(c)))) { t.disabled = false; return; }
+    if (!(await write(() => DB.doc("config/inventario").set({ itens: p.itens, importadoEm: Date.now(), importadoPor: meuEmail() || opNome() })))) { t.disabled = false; return; }
+    const par = paradosMap(); let n = 0;
+    for (const x of p.parar) {
+      if (par.has(x.code)) continue;
+      if (!(await write(() => DB.doc("parados/" + x.code).set({ tipo: x.code.slice(0, 2), estado: x.estado, motivo: x.motivo, em: Date.now(), por: opNome() || "importação do inventário" })))) break;
+      n++;
+    }
+    ui.importPrev = null; render();
+    toast(`Inventário importado: ${p.total} equipamentos${n ? `, ${n} em manutenção ou baixa` : ""}.`, 5000);
+  },
+  async "inv-baixar"() {
+    const par = paradosMap(), rows = [["Código", "Modelo", "Nº no lote", "Patrimônio", "Local", "Situação", "Motivo"]];
+    for (const c of [...codesFor("NB"), ...codesFor("TB")]) { const i = inv(c), pp = par.get(c); rows.push([c, i.modelo || "", i.lote || "", i.patrimonio || "", i.local || "", pp ? (pp.estado === "baixa" ? "Baixa" : "Manutenção") : "Disponível", pp ? pp.motivo || "" : ""]); }
+    const csv = "\ufeff" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    try { await downloads.save({ filename: `inventario-${dayKey()}.csv`, data: csv }); toast("Inventário salvo"); } catch (e) { if (!e || e.code !== "declined") toast("Não deu para baixar aqui."); }
+  },
+  async etiquetas() {
+    const par = paradosMap(), codes = [...codesFor("NB"), ...codesFor("TB")].filter(c => (par.get(c) || {}).estado !== "baixa");
+    if (!codes.length) return toast("Nenhum equipamento para etiquetar.");
+    let el = $("#print"); if (!el) { el = document.createElement("div"); el.id = "print"; document.body.appendChild(el); }
+    el.innerHTML = codes.map(c => { const i = inv(c); return `<div class="etq"><img src="icons/cog-bulb.png" alt=""><div><b>${c}</b><span>${esc(i.modelo || "")}</span><span>${i.patrimonio ? "Patrimônio " + esc(i.patrimonio) : ""}</span><small>COG · Ensino Integral</small></div></div>`; }).join("");
+    try { await Promise.all([...el.querySelectorAll("img")].slice(0, 1).map(img => img.decode())); } catch {}
+    window.print();
+  },
   async "pr-ok"(t) {
     const st = modal.state, motivo = $("#pr-motivo").value.trim(); t.disabled = true;
     if (emUsoMap().has(st.code) && !(await registrarDevolucao([st.code], "devolução automática ao parar o equipamento"))) { t.disabled = false; return; }
@@ -1144,6 +1309,8 @@ document.addEventListener("input", (ev) => {
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.id === "rt-fin" && modal.state) modal.state.fin = t.value;
+  if (t.id === "rt-modelo" && modal.state) { modal.state.modelo = t.value; modal.draw(); }
+  if (t.id === "inv-file" && t.files && t.files[0]) lerArquivoInventario(t.files[0]);
   if (t.id === "agenda-date" && t.value) { ui.date = t.value; subscribeReservas(); render(); }
 });
 document.addEventListener("keydown", (ev) => {
@@ -1160,7 +1327,7 @@ function toast(msg, ms = 2800) {
 }
 
 /* ---------- Início ---------- */
-function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [] }); ui.semAcesso = false; }
+function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {} }); ui.semAcesso = false; ui.importPrev = null; }
 async function boot() {
   const conf = HOSTED && window.PARQUETEC_FIREBASE;
   if (HOSTED) {

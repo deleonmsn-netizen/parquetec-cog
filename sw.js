@@ -1,7 +1,7 @@
 // Guarda o app no aparelho para abrir rápido e funcionar com internet fraca.
 // Ao publicar uma versão nova, troque o número abaixo.
-const CACHE = "parquetec-v4";
-const SHELL = ["./", "./index.html", "./config.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/cog-bulb.png", "./icons/cog-logo.webp"];
+const CACHE = "parquetec-v5";
+const SHELL = ["./", "./index.html", "./config.js", "./inventario-cog.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/cog-bulb.png", "./icons/cog-logo.webp"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
