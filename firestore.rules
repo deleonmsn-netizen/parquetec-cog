@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /escolas/{escola} {
+      // E-mail da coordenação (o mesmo do campo "dono" no config.js).
+      function dono() {
+        return request.auth != null
+          && request.auth.token.email.lower() == "gomescomendadoroliveira@gmail.com"
+          && request.auth.token.email_verified == true;
+      }
+      function acesso() {
+        return request.auth != null
+          && exists(/databases/$(database)/documents/escolas/$(escola)/acessos/$(request.auth.token.email.lower()));
+      }
+      function coordenacao() {
+        return dono() || (acesso()
+          && get(/databases/$(database)/documents/escolas/$(escola)/acessos/$(request.auth.token.email.lower())).data.papel == "admin");
+      }
+      function liberado() { return dono() || acesso(); }
+
+      // Só a coordenação muda acessos, configurações e equipamentos parados.
+      match /acessos/{email} { allow read: if liberado(); allow write: if coordenacao(); }
+      match /config/{doc}    { allow read: if liberado(); allow write: if coordenacao(); }
+      match /parados/{doc}   { allow read: if liberado(); allow write: if coordenacao(); }
+
+      // Retiradas, agenda, recados e pessoas: qualquer pessoa liberada.
+      match /{colecao}/{doc} {
+        allow read, write: if liberado() && !(colecao in ["acessos", "config", "parados"]);
+      }
+    }
+  }
+}

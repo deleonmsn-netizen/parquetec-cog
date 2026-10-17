@@ -1,0 +1,1206 @@
+<!--pwa--><!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!--/pwa--><title>ParqueTEC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--pwa--><meta name="description" content="Retirada, devolução e agenda dos notebooks e tablets da escola.">
+<meta name="theme-color" content="#27323d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ParqueTEC">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<script src="config.js"></script>
+<style>:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<!--/pwa--><link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one column of app screens (max 620px) under an indigo band, with a fixed action bar
+   (Retirar / Devolver + navegação) at the bottom, like a phone app on any screen size. */
+:root{
+  --bg:#f4f2ee; --surface:#ffffff; --surface-2:#f8f6f2; --ink:#1e262e; --muted:#636d77; --line:#e4e0d8;
+  --head:#27323d; --brand:#27323d; --brand-ink:#ffffff; --brand-soft:#efe5d6; --accent:#8a5a24; --plate:#ffffff;
+  --ok-bg:#e3f4ae; --ok-ink:#3a5400; --use-bg:#cdeff8; --use-ink:#0a5a70;
+  --stop-bg:#fde0d6; --stop-ink:#97320f; --park-bg:#e2e7ed; --park-ink:#27323d;
+  --go:#86c51f; --go-ink:#203300; --back:#93d7ee; --back-ink:#073b4b;
+  --danger:#c0352b; --danger-soft:#fbe4e1; --shadow:0 1px 2px rgba(30,38,46,.06),0 6px 20px rgba(30,38,46,.06);
+  --f-display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:14px; --r-sm:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13171c; --surface:#1b2128; --surface-2:#222932; --ink:#ebeef1; --muted:#9ca7b2; --line:#2d3540;
+  --head:#1f2831; --brand:#3b4b5b; --brand-ink:#ffffff; --brand-soft:#3a2f22; --accent:#e3ad6e; --plate:#ffffff;
+  --ok-bg:#2b3a10; --ok-ink:#cdee86; --use-bg:#0f3845; --use-ink:#a2e4f6;
+  --stop-bg:#42231a; --stop-ink:#ffb59c; --park-bg:#26313c; --park-ink:#cfdae5;
+  --go:#7ab51a; --go-ink:#162400; --back:#5fb8d6; --back-ink:#062a36;
+  --danger:#ff7a6e; --danger-soft:#3d1c1a; --shadow:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13171c; --surface:#1b2128; --surface-2:#222932; --ink:#ebeef1; --muted:#9ca7b2; --line:#2d3540;
+  --head:#1f2831; --brand:#3b4b5b; --brand-ink:#ffffff; --brand-soft:#3a2f22; --accent:#e3ad6e; --plate:#ffffff;
+  --ok-bg:#2b3a10; --ok-ink:#cdee86; --use-bg:#0f3845; --use-ink:#a2e4f6;
+  --stop-bg:#42231a; --stop-ink:#ffb59c; --park-bg:#26313c; --park-ink:#cfdae5;
+  --go:#7ab51a; --go-ink:#162400; --back:#5fb8d6; --back-ink:#062a36;
+  --danger:#ff7a6e; --danger-soft:#3d1c1a; --shadow:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--head)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 60%,transparent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+.wrap{max-width:620px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* Header */
+.top{background:var(--head);color:#ffffff;position:sticky;top:env(safe-area-inset-top,0px);z-index:20}
+.top .wrap{display:flex;align-items:center;gap:12px;padding-block:12px}
+.logo{width:44px;height:44px;flex:none;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
+.school{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#e3ad6e;line-height:1.2}
+.brand{min-width:0;flex:1}
+.brand h1{font-size:20px;font-weight:800;letter-spacing:-.01em;line-height:1.1}
+.brand h1 span{font-weight:600;color:#e3ad6e}
+.who{font-size:12.5px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top-btn{background:rgba(255,255,255,.14);border:0;color:inherit;border-radius:999px;padding:7px 14px;font-weight:600;font-size:13px}
+.top-btn:hover{background:rgba(255,255,255,.24)}
+.mode{font-size:12.5px;padding:8px 12px;border-radius:var(--r-sm);background:var(--stop-bg);color:var(--stop-ink);margin-top:12px}
+
+main{padding-block:16px 190px}
+.stack{display:flex;flex-direction:column;gap:14px}
+
+/* Segmented controls */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;background:var(--surface-2);border:1px solid var(--line);padding:4px;border-radius:999px}
+.seg button{border:0;background:transparent;border-radius:999px;padding:9px 10px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);box-shadow:var(--shadow)}
+.seg.small button{padding:6px 10px;font-size:13.5px}
+.seg.soft button[aria-pressed="true"]{background:var(--brand-soft);color:var(--ink);box-shadow:none}
+
+/* Stat tiles */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{border-radius:var(--r);padding:12px 14px 14px;min-height:92px;display:flex;flex-direction:column;justify-content:space-between}
+.tile .lbl{font-size:13px;font-weight:600}
+.tile .num{font-family:var(--f-display);font-weight:800;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.t-ok{background:var(--ok-bg);color:var(--ok-ink)} .t-use{background:var(--use-bg);color:var(--use-ink)}
+.t-stop{background:var(--stop-bg);color:var(--stop-ink)} .t-park{background:var(--park-bg);color:var(--park-ink)}
+.note{font-size:12.5px;color:var(--muted)}
+
+/* Cards and lists */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.sec-h h2{font-size:17px;font-weight:800}
+.sec-h .note{white-space:nowrap}
+.empty{text-align:center;padding:28px 12px;color:var(--muted)}
+.empty svg{display:block;margin:0 auto 10px}
+.list{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:600;overflow-wrap:anywhere}
+.row .s{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;padding:3px 8px;border-radius:999px;background:var(--use-bg);color:var(--use-ink)}
+.chip.done{background:var(--surface-2);color:var(--muted);text-decoration:line-through}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
+.badge.late{background:var(--danger-soft);color:var(--danger)}
+
+/* Buttons */
+.btn{border:0;border-radius:var(--r-sm);padding:11px 16px;font-weight:700;background:var(--brand);color:var(--brand-ink);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.block{width:100%;padding:14px 16px;font-size:15.5px}
+.btn.go{background:var(--go);color:var(--go-ink)}
+.btn.back{background:var(--back);color:var(--back-ink)}
+.btn.ghost{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:999px}
+.btn.danger{background:var(--danger-soft);color:var(--danger)}
+.link{border:0;background:none;padding:4px 2px;color:var(--accent);font-weight:700}
+.mini{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.mini.warn{border-color:var(--danger);color:var(--danger);background:var(--danger-soft)}
+
+/* Forms */
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+.inp{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:11px 12px;font-size:15px;color:var(--ink)}
+textarea.inp{min-height:84px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2>*{min-width:0}
+.grid2.hora{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px 8px;align-items:end;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.grid2.hora .n{grid-column:1/3}
+.grid2.hora .hx{grid-column:3;grid-row:1}
+.grid2.hora .inp{padding:9px 8px;font-size:14px}
+@media (min-width:520px){.grid2.hora{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto;border-bottom:0;padding-bottom:0}.grid2.hora .n{grid-column:auto}.grid2.hora .hx{grid-column:4}}
+
+/* Agenda */
+.datebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.datebar .grow{flex:1 1 180px;min-width:0}
+.datebar .ctrl{display:flex;align-items:center;gap:6px;margin-left:auto}
+.datebar .d1{font-weight:700}
+.datebar input[type=date]{border:1px solid var(--line);background:var(--surface-2);border-radius:var(--r-sm);padding:7px 8px;color:var(--ink)}
+.slot{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
+.slot:first-child{border-top:0}
+.slot .t{font-weight:700}
+.slot .s{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.free{min-width:52px;text-align:center;border-radius:var(--r-sm);background:var(--ok-bg);color:var(--ok-ink);padding:4px 6px;line-height:1}
+.free b{font-family:var(--f-display);font-size:22px;display:block;font-variant-numeric:tabular-nums}
+.free small{font-size:11px}
+.free.zero{background:var(--danger-soft);color:var(--danger)}
+.res{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.res-i{display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:var(--r-sm);padding:8px 10px;font-size:13.5px}
+.res-i .grow{flex:1;min-width:0;overflow-wrap:anywhere}
+
+/* Equipment grid */
+.codes{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;max-height:300px;overflow-y:auto;padding:2px}
+.code{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 2px;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;text-align:center}
+.code[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.code.inuse{background:var(--use-bg);color:var(--use-ink);border-color:transparent}
+.code.manut{background:var(--stop-bg);color:var(--stop-ink);border-color:transparent}
+.code.baixa{background:color-mix(in srgb,var(--muted) 28%,var(--surface));color:var(--muted);text-decoration:line-through;border-color:transparent}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+
+/* History */
+.day{font-size:13px;font-weight:700;margin:4px 0 2px;display:flex;justify-content:space-between;color:var(--muted)}
+.day b{color:var(--ink)}
+.time{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;align-self:flex-start;padding-top:2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--go);flex:none;align-self:flex-start;margin-top:7px}
+.dot.open{background:var(--back)}
+
+/* Messages */
+.msg{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.msg.pin{border-color:var(--brand);background:color-mix(in srgb,var(--brand-soft) 55%,var(--surface))}
+.msg p{margin:4px 0 8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg .meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.msg .meta .grow{flex:1}
+
+/* Bottom bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:25;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.bar .wrap{padding-block:10px 4px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acts .btn{padding:14px;font-size:16px;border-radius:12px}
+nav.tabs{display:grid;grid-template-columns:repeat(6,1fr);margin-top:6px}
+nav.tabs [data-act]{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 4px;font-size:11.5px;font-weight:600;color:var(--muted);position:relative;text-decoration:none}
+nav.tabs [aria-current="page"]{color:var(--accent)}
+nav.tabs svg{width:22px;height:22px}
+nav.tabs .pip{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;height:16px;border-radius:8px;background:var(--danger);color:#fff;font-size:10px;line-height:16px;padding:0 4px}
+
+/* Sheet (modal) */
+.ov{position:fixed;inset:0;z-index:40;background:rgba(18,16,40,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:620px;max-height:92vh;overflow-y:auto;border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-left,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.sheet>*{flex-shrink:0}
+@media (min-width:700px){.ov{align-items:center}.sheet{border-radius:20px;max-height:86vh;padding:22px}}
+.sheet-h{display:flex;align-items:center;gap:10px}
+.sheet-h h2{flex:1;font-size:20px;font-weight:800}
+.x{border:0;background:var(--surface-2);width:34px;height:34px;border-radius:50%;font-size:18px;line-height:1;color:var(--muted)}
+.step{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pick{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto}
+.pick button{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-sm);padding:9px 12px}
+.pick button .s{display:block;font-size:12px;color:var(--muted)}
+.chosen{display:flex;align-items:center;gap:10px;background:var(--brand-soft);color:var(--ink);border-radius:var(--r-sm);padding:10px 12px}
+.chosen .grow{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.stepper{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stepper input{width:76px;text-align:center}
+.sum{background:var(--surface-2);border-radius:var(--r-sm);padding:10px 12px;font-size:13.5px}
+
+.toast{position:fixed;left:50%;bottom:calc(170px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:999px;font-weight:600;font-size:14px;max-width:calc(100% - 32px);box-shadow:var(--shadow);text-align:center}
+.loading{padding:60px 0;text-align:center;color:var(--muted)}
+@media (max-width:380px){.tile .num{font-size:34px} nav.tabs [data-act]{font-size:10.5px}}
+@media (prefers-reduced-motion: no-preference){.sheet.anim{animation:up .18s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.6}}}
+.install{display:flex;gap:12px;align-items:center;background:var(--brand-soft);color:var(--ink);border-radius:var(--r);padding:12px 14px}
+.install .grow{flex:1;min-width:0;font-size:13.5px}
+.install b{display:block;font-size:14.5px}
+.login{max-width:420px;margin:24px auto 0}
+.plate{background:var(--plate);border-radius:var(--r);padding:14px;display:grid;place-items:center}
+.plate img{width:200px;height:auto}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+</style>
+<!--pwa--></head>
+<body>
+<!--/pwa-->
+
+<header class="top">
+  <div class="wrap">
+    <img class="logo" src="icons/cog-bulb.png" alt="" width="44" height="44">
+    <div class="brand">
+      <div class="school">COG · Ensino Integral</div>
+      <h1>Parque<span>TEC</span></h1>
+      <div class="who" id="who">Carregando…</div>
+    </div>
+    <button class="top-btn" data-act="operador">Trocar</button>
+  </div>
+</header>
+
+<main class="wrap" id="main"><div class="loading">Abrindo os dados da escola…</div></main>
+
+<div class="bar">
+  <div class="wrap">
+    <div class="acts">
+      <button class="btn go" data-act="retirar">Retirar</button>
+      <button class="btn back" data-act="devolver">Devolver</button>
+    </div>
+    <nav class="tabs" id="tabs"></nav>
+  </div>
+</div>
+<div id="modal"></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------- Utilidades ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const pad = (n) => String(n).padStart(2, "0");
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const keyToDate = (k) => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+const hhmm = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const fmtLong = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+const fmtWeek = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
+const norm = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const TIPOS = { NB: { nome: "Notebooks", um: "notebook", campo: "notebooks" }, TB: { nome: "Tablets", um: "tablet", campo: "tablets" } };
+const SEGS = { medio: "Ensino Médio", fund: "Fundamental" };
+const FINS = ["Aula regular", "Agendamento", "Uso administrativo", "Outro"];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("parquetec:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("parquetec:" + k, JSON.stringify(v)); } catch {} }
+};
+function dayLabel(k) {
+  const today = dayKey(), y = new Date(); y.setDate(y.getDate() - 1);
+  const d = keyToDate(k), base = `${fmtWeek.format(d)}, ${fmtLong.format(d)}`;
+  if (k === today) return ["Hoje", base];
+  if (k === dayKey(y)) return ["Ontem", base];
+  return ["", base.charAt(0).toUpperCase() + base.slice(1)];
+}
+async function sha(s) {
+  try {
+    const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("parquetec|" + s));
+    return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+  } catch { let h = 0; for (const c of "parquetec|" + s) h = (h * 31 + c.charCodeAt(0)) | 0; return "h" + h; }
+}
+
+/* ---------- Banco de dados: nuvem (claude.ai) ou local ---------- */
+function localDB() {
+  const KEY = "parquetec:local-db";
+  let data = {}; try { data = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch {}
+  const subs = new Set();
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {} setTimeout(() => subs.forEach(f => f())); };
+  const merge = (a, b) => { const o = { ...a }; for (const [k, v] of Object.entries(b)) o[k] = v && typeof v === "object" && !Array.isArray(v) && o[k] && typeof o[k] === "object" && !Array.isArray(o[k]) ? merge(o[k], v) : v; return o; };
+  const snap = (path) => { const d = data[path]; return { id: path.split("/").pop(), exists: !!d, data: () => d ? clone(d) : undefined, metadata: { fromCache: false, hasPendingWrites: false } }; };
+  const ops = { "==": (a, b) => a === b, "!=": (a, b) => a !== b, "<": (a, b) => a < b, "<=": (a, b) => a <= b, ">": (a, b) => a > b, ">=": (a, b) => a >= b, "in": (a, b) => b.includes(a) };
+  const docRef = (path) => ({
+    id: path.split("/").pop(), path,
+    get: async () => snap(path),
+    set: async (v) => { data[path] = clone(v); save(); },
+    update: async (v) => { if (!data[path]) throw { code: "invalid_argument", message: "missing" }; data[path] = merge(data[path], clone(v)); save(); },
+    delete: async () => { delete data[path]; save(); },
+    onSnapshot: (next) => { const f = () => next(snap(path)); subs.add(f); setTimeout(f); return () => subs.delete(f); }
+  });
+  const query = (col, filters = [], ord = null, lim = 0) => {
+    const depth = col.split("/").length + 1;
+    const run = () => {
+      let docs = Object.keys(data).filter(p => p.startsWith(col + "/") && p.split("/").length === depth).map(snap);
+      docs = docs.filter(d => filters.every(([f, op, v]) => ops[op](d.data()[f], v)));
+      if (ord) docs.sort((a, b) => { const x = a.data()[ord[0]], y = b.data()[ord[0]]; return (x > y ? 1 : x < y ? -1 : 0) * (ord[1] === "desc" ? -1 : 1); });
+      else docs.sort((a, b) => a.id < b.id ? -1 : 1);
+      if (lim) docs = docs.slice(0, lim);
+      return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: { fromCache: false, hasPendingWrites: false } };
+    };
+    return {
+      where: (f, op, v) => query(col, [...filters, [f, op, v]], ord, lim),
+      orderBy: (f, dir = "asc") => query(col, filters, [f, dir], lim),
+      limit: (n) => query(col, filters, ord, n),
+      get: async () => run(),
+      onSnapshot: (next) => { const f = () => next(run()); subs.add(f); setTimeout(f); return () => subs.delete(f); }
+    };
+  };
+  return {
+    doc: docRef,
+    collection: (col) => ({ ...query(col), path: col, doc: (id) => docRef(col + "/" + (id || uid())), add: async (v) => { const r = docRef(col + "/" + uid()); await r.set(v); return r; } })
+  };
+}
+
+/* Firebase (Firestore + login por e-mail), usado quando config.js traz a configuração do projeto. */
+async function firebaseDB(conf) {
+  const base = "https://www.gstatic.com/firebasejs/10.12.2/";
+  const [appM, fs, au] = await Promise.all([import(base + "firebase-app.js"), import(base + "firebase-firestore.js"), import(base + "firebase-auth.js")]);
+  const app = appM.initializeApp(conf);
+  let db;
+  try { db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) }); }
+  catch { db = fs.getFirestore(app); }
+  const auth = au.getAuth(app);
+  // Segunda instância só para criar logins de outras pessoas sem desconectar quem está usando.
+  const auth2 = au.initializeAuth(appM.initializeApp(conf, "cadastro"), { persistence: au.inMemoryPersistence });
+  const P = (p) => `escolas/${conf.escola || "principal"}/${p}`;
+  const snapOf = (d) => ({ id: d.id, exists: d.exists(), data: () => d.data(), metadata: d.metadata });
+  const qsnap = (s) => ({ docs: s.docs.map(snapOf), size: s.size, empty: s.empty, metadata: s.metadata });
+  // Sem internet a gravação fica guardada no aparelho e sobe sozinha depois; não trava a tela esperando o servidor.
+  const queued = (p) => { p.catch(e => { console.warn(e); toast(errMsg(e), 6000); }); return Promise.race([p, new Promise(r => setTimeout(r, 1500))]); };
+  const docRef = (path) => {
+    const r = fs.doc(db, P(path));
+    return {
+      id: r.id, path,
+      get: async () => snapOf(await fs.getDoc(r)),
+      set: (v) => queued(fs.setDoc(r, v)),
+      update: (v) => queued(fs.setDoc(r, v, { merge: true })),
+      delete: () => queued(fs.deleteDoc(r)),
+      onSnapshot: (next, err) => fs.onSnapshot(r, s => next(snapOf(s)), err)
+    };
+  };
+  const query = (col, cons = []) => {
+    const q = () => fs.query(fs.collection(db, P(col)), ...cons);
+    return {
+      where: (f, op, v) => query(col, [...cons, fs.where(f, op, v)]),
+      orderBy: (f, dir = "asc") => query(col, [...cons, fs.orderBy(f, dir)]),
+      limit: (n) => query(col, [...cons, fs.limit(n)]),
+      get: async () => qsnap(await fs.getDocs(q())),
+      onSnapshot: (next, err) => fs.onSnapshot(q(), s => next(qsnap(s)), err)
+    };
+  };
+  return {
+    db: { doc: docRef, collection: (col) => ({ ...query(col), path: col, doc: (id) => docRef(col + "/" + (id || uid())) }) },
+    onAuth: (fn) => au.onAuthStateChanged(auth, fn),
+    login: (email, senha) => au.signInWithEmailAndPassword(auth, email, senha),
+    reset: (email) => au.sendPasswordResetEmail(auth, email),
+    logout: () => au.signOut(auth),
+    criarConta: async (email, senha) => {
+      try { await au.createUserWithEmailAndPassword(auth2, email, senha); await au.signOut(auth2); return true; }
+      catch (e) { if (e && e.code === "auth/email-already-in-use") return false; throw e; }
+    },
+    criarDono: async (email, senha) => { const c = await au.createUserWithEmailAndPassword(auth, email, senha); await au.sendEmailVerification(c.user); },
+    reenviar: () => au.sendEmailVerification(auth.currentUser),
+    recarregar: async () => { await auth.currentUser.reload(); await auth.currentUser.getIdToken(true); return auth.currentUser; }
+  };
+}
+
+let DB = null, MODE = "local", downloads = null, FB = null, AUTH = null, installEvt = null;
+const HOSTED = !(window.claude && typeof window.claude.use === "function");
+const STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [] };
+const CONF = window.PARQUETEC_FIREBASE || {};
+const meuEmail = () => String(AUTH && AUTH.email || "").toLowerCase();
+const souDono = () => !!(CONF.dono && meuEmail() === String(CONF.dono).toLowerCase());
+const meuAcesso = () => S.acessos.find(a => a.id === meuEmail());
+// Fora do Firebase não há logins: quem abre o app pode tudo.
+const isAdmin = () => MODE !== "firebase" || souDono() || (meuAcesso() || {}).papel === "admin";
+const ui = {
+  tab: store.get("tab", "painel"), tipo: "NB", seg: store.get("seg", "medio"), date: dayKey(),
+  histQ: "", histLimit: 300, gerTipo: "NB", gerQ: "", showInativos: false, armed: null, unlocked: false
+};
+let operador = store.get("operador", null);
+const unsub = {};
+
+function defaultConfig() {
+  return {
+    escola: "", notebooks: 0, tablets: 0, whatsapp: "", pinHash: "",
+    horarios: {
+      medio: [["1ª aula", "07:00", "07:50"], ["2ª aula", "07:50", "08:40"], ["3ª aula", "08:40", "09:30"], ["4ª aula", "09:50", "10:40"], ["5ª aula", "10:40", "11:30"], ["6ª aula", "11:30", "12:20"]].map(([nome, ini, fim]) => ({ nome, ini, fim })),
+      fund: [["1ª aula", "13:00", "13:50"], ["2ª aula", "13:50", "14:40"], ["3ª aula", "14:40", "15:30"], ["4ª aula", "15:50", "16:40"], ["5ª aula", "16:40", "17:30"]].map(([nome, ini, fim]) => ({ nome, ini, fim }))
+    }
+  };
+}
+const cfg = () => S.config || defaultConfig();
+
+function listen(name, ref, apply) {
+  if (unsub[name]) unsub[name]();
+  unsub[name] = ref.onSnapshot(snap => { apply(snap); scheduleRender(); }, err => {
+    console.warn(name, err);
+    if (err && err.code === "revoked") toast("O acesso a este app foi alterado. Recarregue a página.");
+    if (err && err.code === "permission-denied") { ui.semAcesso = true; scheduleRender(); }
+  });
+}
+const docsOf = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+function subscribeAll() {
+  listen("config", DB.doc("config/main"), s => { S.config = s.exists ? { ...defaultConfig(), ...s.data() } : null; S.configLoaded = true; });
+  listen("pessoas", DB.collection("pessoas"), s => { S.pessoas = docsOf(s).sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1); });
+  listen("abertos", DB.collection("emprestimos").where("aberto", "==", true), s => { S.abertos = docsOf(s).sort((a, b) => b.retiradoEm - a.retiradoEm); });
+  listen("parados", DB.collection("parados"), s => { S.parados = docsOf(s); });
+  listen("recados", DB.collection("recados").orderBy("em", "desc").limit(60), s => { S.recados = docsOf(s); });
+  subscribeHist(); subscribeReservas();
+  if (MODE === "firebase") listen("acessos", DB.collection("acessos"), s => {
+    S.acessos = docsOf(s);
+    const a = meuAcesso();
+    if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: a.papel === "admin" ? "Coordenação" : "" }; store.set("operador", operador); }
+  });
+}
+function subscribeHist() { listen("hist", DB.collection("emprestimos").orderBy("retiradoEm", "desc").limit(ui.histLimit), s => { S.hist = docsOf(s); }); }
+function subscribeReservas() { listen("reservas", DB.collection("reservas").where("data", "==", ui.date), s => { S.reservas = docsOf(s); }); }
+
+function errMsg(e) {
+  const code = e && e.code;
+  return code === "invalid_argument" || code === "permission-denied" ? "Você não tem permissão para alterar os dados. Entre com um usuário autorizado."
+    : code === "quota_exceeded" ? "O espaço de dados está cheio. Apague recados antigos e tente de novo."
+    : code === "resource_exhausted" || code === "resource-exhausted" ? "Muitas ações seguidas. Espere alguns segundos e tente de novo."
+    : "Não deu para salvar agora. Confira a internet e tente de novo.";
+}
+async function write(fn, okMsg) {
+  try { await fn(); if (okMsg) toast(okMsg); return true; }
+  catch (e) { toast(errMsg(e), 5000); console.warn(e); return false; }
+}
+
+/* ---------- Estado derivado ---------- */
+function codesFor(t) { const n = Math.max(0, Math.min(200, Number(cfg()[TIPOS[t].campo]) || 0)); return Array.from({ length: n }, (_, i) => `${t}-${String(i + 1).padStart(3, "0")}`); }
+function emUsoMap() {
+  const m = new Map();
+  for (const e of S.abertos) for (const c of e.codes || []) if (!(e.devolvidos || {})[c]) m.set(c, e);
+  return m;
+}
+function paradosMap() { const m = new Map(); for (const p of S.parados) m.set(p.id, p); return m; }
+function stats(t) {
+  const codes = codesFor(t), uso = emUsoMap(), par = paradosMap();
+  let manut = 0, baixa = 0, emUso = 0, disp = 0;
+  for (const c of codes) {
+    const p = par.get(c);
+    if (p && p.estado === "baixa") baixa++;
+    else if (p) manut++;
+    else if (uso.has(c)) emUso++;
+    else disp++;
+  }
+  return { total: codes.length, manut, baixa, emUso, disp, parque: codes.length - baixa, parados: manut + baixa };
+}
+function disponiveis(t) { const uso = emUsoMap(), par = paradosMap(); return codesFor(t).filter(c => !uso.has(c) && !par.has(c)); }
+function pendentes(e) { return (e.codes || []).filter(c => !(e.devolvidos || {})[c]); }
+const pessoa = (id) => S.pessoas.find(p => p.id === id);
+const opNome = () => operador ? operador.nome : "";
+
+/* ---------- Renderização ---------- */
+let renderQueued = false;
+function scheduleRender() { if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); } }
+
+const ICONS = {
+  painel: '<path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-4H4zM14 7h6V4h-6z"/>',
+  agenda: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  recados: '<path d="M4 5h16v11H9l-5 4z"/>',
+  historico: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  gerenciar: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  whatsapp: '<path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.5-2-1-1 .8a4 4 0 0 1-1.8-1.8l.8-1-1-2z"/>'
+};
+const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+const TABS = [["painel", "Painel"], ["agenda", "Agenda"], ["recados", "Recados"], ["historico", "Histórico"], ["gerenciar", "Gerenciar"]];
+
+function renderTabs() {
+  const seen = store.get("recadosVistos", 0);
+  const novos = S.recados.filter(r => r.em > seen && r.autorId !== (operador && operador.id)).length;
+  const wa = String(cfg().whatsapp || "").replace(/\D/g, "");
+  let h = TABS.map(([k, l]) => `<button data-act="tab" data-v="${k}" ${ui.tab === k ? 'aria-current="page"' : ""}>${icon(k)}${l}${k === "recados" && novos && ui.tab !== "recados" ? `<span class="pip">${novos}</span>` : ""}</button>`).join("");
+  h += wa ? `<a data-act="wa" href="https://wa.me/${wa}" target="_blank" rel="noopener">${icon("whatsapp")}WhatsApp</a>` : "";
+  const tabs = $("#tabs");
+  tabs.style.gridTemplateColumns = `repeat(${wa ? 6 : 5},1fr)`;
+  tabs.innerHTML = h;
+}
+
+function render() {
+  const a = document.activeElement, fid = a && a.id, sel = a && "selectionStart" in a ? [a.selectionStart, a.selectionEnd] : null;
+  $("#who").textContent = operador ? `${operador.nome}${operador.cargo ? " · " + operador.cargo : ""}` : "Toque em Trocar para dizer quem está usando";
+  renderTabs();
+  const precisaLogin = MODE === "firebase" && !AUTH;
+  $(".bar").hidden = precisaLogin; $(".top-btn").hidden = precisaLogin;
+  if (precisaLogin) { if (ui.authReady) { $("#who").textContent = "Entre para continuar"; $("#main").innerHTML = ui.primeiro ? vPrimeiro() : vLogin(); } return; }
+  if (MODE === "firebase" && (ui.verificar || ui.semAcesso)) {
+    $(".bar").hidden = true; $("#who").textContent = AUTH.email || "";
+    $("#main").innerHTML = ui.verificar ? vVerificar() : vSemAcesso(); return;
+  }
+  if (!S.configLoaded) return;
+  const views = { painel: vPainel, agenda: vAgenda, recados: vRecados, historico: vHistorico, gerenciar: vGerenciar };
+  // Guarda o que a pessoa digitou: atualizações de outros aparelhos redesenham a tela.
+  const kept = ui.noKeep ? [] : [...document.querySelectorAll("#main input[id], #main textarea[id], #main select[id]")]
+    .filter(el => el.type === "checkbox" ? el.checked !== el.defaultChecked : el.tagName === "SELECT" ? [...el.options].some(o => o.selected !== o.defaultSelected) : el.value !== el.defaultValue)
+    .map(el => [el.id, el.type === "checkbox" ? el.checked : el.value]);
+  ui.noKeep = false;
+  $("#main").innerHTML = (MODE === "local" ? `<div class="mode">Modo de teste: os dados ficam só neste aparelho${HOSTED ? ". Para juntar celular e computador, siga o passo do Firebase no LEIA-ME." : ". Abra pelo link do claude.ai para salvar na nuvem."}</div>` : "") + `<div class="stack" style="margin-top:${MODE === "local" ? 14 : 0}px">${(views[ui.tab] || vPainel)()}</div>`;
+  for (const [id, v] of kept) { const el = document.getElementById(id); if (el) { if (el.type === "checkbox") el.checked = v; else el.value = v; } }
+  if (fid) { const el = document.getElementById(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} } }
+  if (modal.render) modal.refresh();
+}
+
+function tipoSeg(id, val, act) {
+  return `<div class="seg" role="group" aria-label="Tipo de equipamento">${Object.entries(TIPOS).map(([k, t]) => `<button data-act="${act}" data-v="${k}" aria-pressed="${val === k}" ${id ? `id="${id}-${k}"` : ""}>${t.nome}</button>`).join("")}</div>`;
+}
+
+function setupCard() {
+  if (!isAdmin()) return `<div class="card empty">A coordenação ainda não configurou quantos equipamentos a escola tem. Assim que configurar, tudo aparece aqui.</div>`;
+  return `<div class="card stack">
+    <div class="plate"><img src="icons/cog-logo.webp" alt="COG Ensino Integral" width="200" height="155"></div>
+    <div><h2 style="font-size:19px">Vamos começar</h2><p class="note" style="margin:6px 0 0">Diga quantos equipamentos a escola tem. Os códigos são criados sozinhos (NB-001, NB-002… e TB-001, TB-002…). Dá para mudar depois em Gerenciar.</p></div>
+    <div class="grid2">
+      <label class="f">Notebooks<input class="inp" id="setup-nb" type="number" min="0" max="200" inputmode="numeric" placeholder="ex.: 70"></label>
+      <label class="f">Tablets<input class="inp" id="setup-tb" type="number" min="0" max="200" inputmode="numeric" placeholder="ex.: 54"></label>
+    </div>
+    <button class="btn block" data-act="setup">Salvar e começar</button>
+  </div>`;
+}
+
+function vLogin() {
+  return `<section class="card stack login">
+    <div class="plate"><img src="icons/cog-logo.webp" alt="COG Ensino Integral" width="200" height="155"></div>
+    <div><h2 style="font-size:20px">Entrar no ParqueTEC</h2><p class="note" style="margin:6px 0 0">Use o e-mail e a senha que a coordenação cadastrou. Você só precisa entrar uma vez em cada aparelho.</p></div>
+    <label class="f">E-mail<input class="inp" id="lg-email" type="email" autocomplete="username" inputmode="email" value="${esc(store.get("email", ""))}"></label>
+    <label class="f">Senha<input class="inp" id="lg-senha" type="password" autocomplete="current-password"></label>
+    <button class="btn block" data-act="login">Entrar</button>
+    <button class="link" data-act="esqueci">Esqueci a senha</button>
+    ${CONF.dono ? `<p class="note" style="margin:0;text-align:center">É a coordenação e ainda não tem senha? <button class="link" data-act="primeiro">Primeiro acesso</button></p>` : ""}
+  </section>`;
+}
+function vPrimeiro() {
+  return `<section class="card stack login">
+    <div><h2 style="font-size:20px">Primeiro acesso da coordenação</h2><p class="note" style="margin:6px 0 0">Crie a senha da conta principal. Depois vamos mandar um link de confirmação para este e-mail.</p></div>
+    <label class="f">E-mail<input class="inp" id="pa-email" type="email" value="${esc(CONF.dono)}" readonly></label>
+    <label class="f">Nova senha (mínimo 6 caracteres)<input class="inp" id="pa-senha" type="password" autocomplete="new-password"></label>
+    <label class="f">Repita a senha<input class="inp" id="pa-senha2" type="password" autocomplete="new-password"></label>
+    <button class="btn block" data-act="criar-dono">Criar acesso</button>
+    <button class="link" data-act="voltar-login">Voltar</button>
+  </section>`;
+}
+function vVerificar() {
+  return `<section class="card stack login">
+    <div><h2 style="font-size:20px">Confirme seu e-mail</h2><p class="note" style="margin:6px 0 0">Mandamos um link para <b>${esc(AUTH.email)}</b>. Abra o e-mail (olhe também o spam), toque no link e depois volte aqui.</p></div>
+    <button class="btn block" data-act="ja-confirmei">Já confirmei</button>
+    <button class="btn ghost block" data-act="reenviar">Mandar o link de novo</button>
+    <button class="link" data-act="sair">Sair</button>
+  </section>`;
+}
+function vSemAcesso() {
+  return `<section class="card stack login">
+    <div><h2 style="font-size:20px">Sem acesso ainda</h2><p class="note" style="margin:6px 0 0">O login <b>${esc(AUTH.email)}</b> existe, mas a coordenação ainda não liberou o acesso ao app. Peça para ela liberar em Gerenciar → Acessos ao app.</p></div>
+    <button class="btn block" onclick="location.reload()">Tentar de novo</button>
+    <button class="link" data-act="sair">Sair</button>
+  </section>`;
+}
+function installCard() {
+  if (!HOSTED || STANDALONE || store.get("installDispensado", false)) return "";
+  if (installEvt) return `<div class="install"><div class="grow"><b>Instale o ParqueTEC</b>Fica com ícone próprio, abre em tela cheia e funciona mesmo com a internet fraca.</div><button class="btn sm" data-act="instalar">Instalar</button><button class="x" data-act="instalar-depois" aria-label="Agora não">×</button></div>`;
+  if (IOS) return `<div class="install"><div class="grow"><b>Instale no iPhone</b>No Safari, toque em Compartilhar <span aria-hidden="true">⬆︎</span> e depois em “Adicionar à Tela de Início”.</div><button class="x" data-act="instalar-depois" aria-label="Agora não">×</button></div>`;
+  return "";
+}
+
+function vPainel() {
+  if (!S.config) return setupCard();
+  const st = stats(ui.tipo);
+  const abertos = S.abertos.filter(e => e.tipo === ui.tipo && pendentes(e).length);
+  const hoje = dayKey();
+  let lista;
+  if (!abertos.length) {
+    lista = `<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M8 12l3 3 5-6"/></svg>Tudo devolvido. Nada pendente.</div>`;
+  } else {
+    lista = `<div class="list">${abertos.map(e => {
+      const pend = pendentes(e), velho = dayKey(new Date(e.retiradoEm)) !== hoje;
+      return `<div class="row"><div class="grow">
+          <div class="t">${esc(e.pessoaNome)} ${velho ? `<span class="badge late">desde ${esc(dayLabel(dayKey(new Date(e.retiradoEm)))[0] || fmtLong.format(new Date(e.retiradoEm)))}</span>` : ""}</div>
+          <div class="s">${esc(e.finalidade)}${e.turma ? " · " + esc(e.turma) : ""} · retirou às ${hhmm(e.retiradoEm)} · ${pend.length} ${pend.length === 1 ? TIPOS[e.tipo].um : TIPOS[e.tipo].nome.toLowerCase()}</div>
+          <div class="chips">${pend.map(c => `<span class="chip">${c}</span>`).join("")}</div>
+        </div><button class="btn back sm" data-act="devolver" data-id="${e.id}">Devolver</button></div>`;
+    }).join("")}</div>`;
+  }
+  const quem = operador ? "" : `<div class="install"><div class="grow"><b>Quem está usando este aparelho?</b>O nome escolhido aparece como “autorizado por” nas retiradas.</div><button class="btn sm" data-act="operador">Escolher</button></div>`;
+  return `${quem}${installCard()}${tipoSeg("", ui.tipo, "tipo")}
+    <div class="tiles">
+      <div class="tile t-ok"><span class="lbl">Disponíveis</span><span class="num">${st.disp}</span></div>
+      <div class="tile t-use"><span class="lbl">Em uso</span><span class="num">${st.emUso}</span></div>
+      <div class="tile t-stop"><span class="lbl">Parados</span><span class="num">${st.parados}</span></div>
+      <div class="tile t-park"><span class="lbl">Total no parque</span><span class="num">${st.parque}</span></div>
+    </div>
+    <div class="note">Em manutenção: ${st.manut} · Baixados: ${st.baixa} (fora do parque) · Cadastrados: ${st.total}</div>
+    <section class="card"><div class="sec-h"><h2>Em uso agora</h2>${abertos.length ? `<span class="note">${abertos.length} ${abertos.length === 1 ? "retirada" : "retiradas"}</span>` : ""}</div>${lista}</section>`;
+}
+
+function reservadosSlot(t, seg, idx) { return S.reservas.filter(r => r.tipo === t && r.seg === seg && r.aula === idx).reduce((s, r) => s + (Number(r.qtd) || 0), 0); }
+function vAgenda() {
+  if (!S.config) return setupCard();
+  const [rel, base] = dayLabel(ui.date);
+  const st = stats(ui.tipo), noParque = st.parque - st.manut;
+  const aulas = cfg().horarios[ui.seg] || [];
+  const slots = aulas.map((a, i) => {
+    const res = S.reservas.filter(r => r.tipo === ui.tipo && r.seg === ui.seg && r.aula === i);
+    const livres = Math.max(0, noParque - reservadosSlot(ui.tipo, ui.seg, i));
+    return `<div class="slot">
+      <div><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.ini)} às ${esc(a.fim)}</div></div>
+      <div class="free ${livres ? "" : "zero"}"><b>${livres}</b><small>livres</small></div>
+      <button class="btn go sm" data-act="agendar" data-i="${i}" ${livres ? "" : "disabled"}>Agendar</button>
+      ${res.length ? `<div class="res">${res.map(r => `<div class="res-i"><div class="grow"><b>${esc(r.pessoaNome)}</b> · ${r.qtd} ${r.qtd == 1 ? TIPOS[r.tipo].um : TIPOS[r.tipo].nome.toLowerCase()}${r.turma ? " · " + esc(r.turma) : ""}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
+        ${ui.date === dayKey() ? `<button class="mini" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : ""}
+        <button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : "Cancelar"}</button></div>`).join("")}</div>` : ""}
+    </div>`;
+  }).join("");
+  return `<div class="card datebar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+      <div class="grow"><div class="d1">${rel ? rel + " · " : ""}${esc(fmtLong.format(keyToDate(ui.date)))}</div><div class="note">${esc(fmtWeek.format(keyToDate(ui.date)))}</div></div>
+      <div class="ctrl"><button class="mini" data-act="dia" data-v="-1" aria-label="Dia anterior">‹</button>
+      <input type="date" id="agenda-date" value="${ui.date}" aria-label="Escolher data">
+      <button class="mini" data-act="dia" data-v="1" aria-label="Próximo dia">›</button></div>
+    </div>
+    ${tipoSeg("", ui.tipo, "tipo")}
+    <div class="seg small soft" role="group" aria-label="Segmento">${Object.entries(SEGS).map(([k, l]) => `<button data-act="seg" data-v="${k}" aria-pressed="${ui.seg === k}">${l}</button>`).join("")}</div>
+    <section class="card">${slots || `<div class="empty">Nenhum horário cadastrado para ${SEGS[ui.seg]}. Adicione em Gerenciar.</div>`}</section>`;
+}
+
+function vRecados() {
+  const pins = S.recados.filter(r => r.fixado), rest = S.recados.filter(r => !r.fixado);
+  const item = (r) => `<article class="msg ${r.fixado ? "pin" : ""}">
+      <div class="meta"><b style="color:var(--ink)">${esc(r.autor || "Sem nome")}</b><span class="grow">${esc(dayLabel(dayKey(new Date(r.em)))[0] || fmtLong.format(new Date(r.em)))} às ${hhmm(r.em)}</span>${r.fixado ? '<span class="badge">fixado</span>' : ""}</div>
+      <p>${esc(r.texto)}</p>
+      <div class="meta"><span class="grow"></span><button class="mini" data-act="fixar" data-id="${r.id}">${r.fixado ? "Desafixar" : "Fixar"}</button><button class="mini ${ui.armed === "rec:" + r.id ? "warn" : ""}" data-act="apagar-rec" data-id="${r.id}">${ui.armed === "rec:" + r.id ? "Confirmar" : "Apagar"}</button></div>
+    </article>`;
+  return `<section class="card stack">
+      <label class="f">Novo recado para a equipe<textarea class="inp" id="recado-txt" placeholder="Ex.: Carregador do NB-014 ficou na sala 7. Os tablets do carrinho 2 estão sem carga."></textarea></label>
+      <button class="btn block" data-act="enviar-rec">Publicar recado</button>
+    </section>
+    ${S.recados.length ? pins.concat(rest).map(item).join("") : `<div class="card empty">Nenhum recado ainda. O que for escrito aqui aparece para todos que usam o app.</div>`}`;
+}
+
+function vHistorico() {
+  const q = norm(ui.histQ);
+  const rows = S.hist.filter(e => !q || norm([e.pessoaNome, e.turma, e.finalidade, e.operador, ...(e.codes || [])].join(" ")).includes(q));
+  const byDay = new Map();
+  for (const e of rows) { const k = dayKey(new Date(e.retiradoEm)); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(e); }
+  let body = "";
+  for (const [k, list] of byDay) {
+    const [rel, base] = dayLabel(k), qtd = list.reduce((s, e) => s + (e.codes || []).length, 0);
+    body += `<div class="day"><span>${rel ? `<b>${rel}</b> · ` : ""}${esc(base)}</span><span>${qtd}</span></div>
+      <section class="card" style="padding-block:4px"><div class="list">${list.map(e => {
+        const pend = pendentes(e), dev = e.devolvidos || {};
+        const ultima = Object.values(dev).reduce((m, d) => Math.max(m, d.em || 0), 0);
+        const estado = pend.length ? `<b style="color:var(--use-ink)">em uso (${pend.length})</b>` : `devolvido às ${hhmm(e.devolvidoEm || ultima)}`;
+        return `<div class="row"><span class="dot ${pend.length ? "open" : ""}"></span><div class="grow">
+          <div class="t">${esc(e.pessoaNome)}${e.turma ? ` <span class="note">· ${esc(e.turma)}</span>` : ""}</div>
+          <div class="s">${esc(e.finalidade)} · ${estado}${e.operador ? ` · autorizado por ${esc(e.operador)}` : ""}${e.obs ? ` · ${esc(e.obs)}` : ""}</div>
+          <div class="chips">${(e.codes || []).map(c => `<span class="chip ${dev[c] ? "done" : ""}">${c}</span>`).join("")}</div>
+        </div><span class="time">${hhmm(e.retiradoEm)}</span></div>`;
+      }).join("")}</div></section>`;
+  }
+  return `<input class="inp" id="hist-q" type="search" placeholder="Buscar por equipamento, pessoa ou turma" value="${esc(ui.histQ)}">
+    ${downloads ? `<button class="btn ghost block" data-act="planilha">Baixar planilha do histórico</button>` : ""}
+    ${body || `<div class="card empty">${q ? "Nada encontrado com essa busca." : "Ainda não há retiradas. Toque em Retirar para registrar a primeira."}</div>`}
+    ${S.hist.length >= ui.histLimit ? `<button class="btn ghost block" data-act="mais-hist">Mostrar retiradas mais antigas</button>` : ""}`;
+}
+
+function vGerenciar() {
+  if (cfg().pinHash && !ui.unlocked) {
+    return `<section class="card stack"><h2 style="font-size:18px">Área protegida</h2><p class="note" style="margin:0">Digite o PIN de administração para mexer em equipamentos, pessoas e configurações.</p>
+      <input class="inp" id="pin-in" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN">
+      <button class="btn block" data-act="desbloquear">Entrar</button></section>`;
+  }
+  if (!S.config) return setupCard();
+  const adm = isAdmin();
+  const t = ui.gerTipo, uso = emUsoMap(), par = paradosMap(), q = norm(ui.gerQ);
+  const codes = codesFor(t).filter(c => !q || norm(c).includes(q.replace(/\s/g, "")));
+  const manut = S.parados.filter(p => p.estado !== "baixa" && p.tipo === t).sort((a, b) => a.id < b.id ? -1 : 1);
+  const baixa = S.parados.filter(p => p.estado === "baixa" && p.tipo === t).sort((a, b) => a.id < b.id ? -1 : 1);
+  const parList = (arr) => arr.map(p => `<div class="row"><div class="grow"><div class="t">${p.id}</div><div class="s">${esc(p.motivo || "sem motivo")} · ${esc(fmtLong.format(new Date(p.em)))}${p.por ? " · " + esc(p.por) : ""}</div></div><button class="mini" data-act="desfazer" data-id="${p.id}">Voltar ao parque</button></div>`).join("");
+  const ativos = S.pessoas.filter(p => p.ativo !== false), inativos = S.pessoas.filter(p => p.ativo === false);
+  const c = cfg();
+  const hor = (seg) => (c.horarios[seg] || []).map((a, i) => `<div class="grid2 hora">
+      <label class="f n">Nome<input class="inp" id="h-${seg}-${i}-nome" value="${esc(a.nome)}"></label>
+      <label class="f">Início<input class="inp" id="h-${seg}-${i}-ini" type="time" value="${esc(a.ini)}"></label>
+      <label class="f">Fim<input class="inp" id="h-${seg}-${i}-fim" type="time" value="${esc(a.fim)}"></label>
+      <button class="x hx" data-act="h-del" data-seg="${seg}" data-i="${i}" aria-label="Remover ${esc(a.nome)}">×</button></div>`).join("");
+  return `${adm ? `<section class="card stack">
+      <div><h2 style="font-size:17px">Manutenção e baixa</h2><p class="note" style="margin:4px 0 0">Toque no código para mandar o equipamento para manutenção ou dar baixa. Se ele estiver em uso, a devolução é registrada sozinha.</p></div>
+      ${tipoSeg("", t, "ger-tipo")}
+      <input class="inp" id="ger-q" type="search" placeholder="Buscar código, ex.: ${t}-004" value="${esc(ui.gerQ)}">
+      <div class="codes">${codes.map(cd => { const p = par.get(cd); const cls = p ? (p.estado === "baixa" ? "baixa" : "manut") : uso.has(cd) ? "inuse" : ""; return `<button class="code ${cls}" data-act="parar" data-v="${cd}">${cd}</button>`; }).join("") || `<span class="note">Nenhum código.</span>`}</div>
+      <div class="legend"><span><i style="background:var(--surface);border:1px solid var(--line)"></i>No parque</span><span><i style="background:var(--use-bg)"></i>Em uso</span><span><i style="background:var(--stop-bg)"></i>Manutenção</span><span><i style="background:color-mix(in srgb,var(--muted) 28%,var(--surface))"></i>Baixado</span></div>
+      ${manut.length ? `<div><div class="step">Em manutenção (${manut.length})</div><div class="list">${parList(manut)}</div></div>` : ""}
+      ${baixa.length ? `<div><div class="step">Baixados (${baixa.length})</div><p class="note" style="margin:2px 0 0">Fora do parque. Continuam no histórico.</p><div class="list">${parList(baixa)}</div></div>` : ""}
+    </section>` : ""}
+
+    <section class="card stack">
+      <h2 style="font-size:17px">Cadastrar pessoa</h2>
+      <label class="f">Nome completo<input class="inp" id="p-nome" placeholder="Ex.: Ricardo Alves de Souza"></label>
+      <div class="grid2">
+        <label class="f">Tipo<select class="inp" id="p-tipo"><option>Profissional</option><option>Aluno</option></select></label>
+        <label class="f">Cargo ou turma<input class="inp" id="p-cargo" placeholder="Professor de Biologia"></label>
+      </div>
+      <button class="btn block" data-act="cad-pessoa">Cadastrar</button>
+      <details><summary class="note" style="cursor:pointer">Cadastrar várias pessoas de uma vez</summary>
+        <div class="stack" style="margin-top:10px">
+          <p class="note" style="margin:0">Cole uma pessoa por linha. Para incluir o cargo ou a turma, use ponto e vírgula: <b>Ana Lima; Professora</b>. Dá para copiar direto de uma planilha.</p>
+          <textarea class="inp" id="p-lote" placeholder="Ana Clara Barbosa do Prado; 3B&#10;Carlos André Ferreira Leal; Professor"></textarea>
+          <div class="grid2"><label class="f">Tipo de todos<select class="inp" id="p-lote-tipo"><option>Profissional</option><option>Aluno</option></select></label><span></span></div>
+          <button class="btn ghost block" data-act="cad-lote">Cadastrar lista</button>
+        </div></details>
+    </section>
+
+    <section class="card">
+      <div class="sec-h"><h2>Pessoas cadastradas (${ativos.length})</h2></div>
+      <div class="list">${ativos.map(p => ui.editP === p.id ? `<div class="row" style="flex-wrap:wrap"><div class="grid2" style="width:100%">
+          <input class="inp" id="e-nome" value="${esc(p.nome)}" aria-label="Nome"><input class="inp" id="e-cargo" value="${esc(p.cargo)}" aria-label="Cargo ou turma"></div>
+          <div style="display:flex;gap:8px;width:100%"><select class="inp" id="e-tipo" style="flex:1" aria-label="Tipo"><option ${p.tipo === "Profissional" ? "selected" : ""}>Profissional</option><option ${p.tipo === "Aluno" ? "selected" : ""}>Aluno</option></select>
+          <button class="btn sm" data-act="salvar-p" data-id="${p.id}">Salvar</button><button class="mini" data-act="editar-p" data-id="">Cancelar</button></div></div>`
+        : `<div class="row"><div class="grow"><div class="t">${esc(p.nome)}</div><div class="s">${esc(p.cargo || p.tipo)}</div></div><button class="mini" data-act="editar-p" data-id="${p.id}">editar</button><button class="mini ${ui.armed === "p:" + p.id ? "warn" : ""}" data-act="desativar-p" data-id="${p.id}">${ui.armed === "p:" + p.id ? "confirmar" : "desativar"}</button></div>`).join("") || `<div class="empty">Ninguém cadastrado ainda.</div>`}</div>
+      ${inativos.length ? `<button class="link" data-act="ver-inativos" style="margin-top:8px">${ui.showInativos ? "Esconder" : "Ver"} desativados (${inativos.length})</button>
+        ${ui.showInativos ? `<div class="list">${inativos.map(p => `<div class="row"><div class="grow"><div class="t" style="color:var(--muted)">${esc(p.nome)}</div><div class="s">${esc(p.cargo || p.tipo)}</div></div><button class="mini" data-act="reativar-p" data-id="${p.id}">reativar</button></div>`).join("")}</div>` : ""}` : ""}
+    </section>
+
+    ${adm && MODE === "firebase" ? vAcessos() : ""}
+    ${adm ? `<section class="card stack">
+      <h2 style="font-size:17px">Quantos equipamentos a escola tem</h2>
+      <div class="grid2">
+        <label class="f">Notebooks<input class="inp" id="c-nb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.notebooks) || 0}"></label>
+        <label class="f">Tablets<input class="inp" id="c-tb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.tablets) || 0}"></label>
+      </div>
+      <p class="note" style="margin:0">Os códigos vão de NB-001 a NB-${String(Number(c.notebooks) || 0).padStart(3, "0")} e de TB-001 a TB-${String(Number(c.tablets) || 0).padStart(3, "0")}. Máximo de 200 de cada.</p>
+      <h2 style="font-size:17px;margin-top:6px">Horários das aulas</h2>
+      ${Object.entries(SEGS).map(([seg, l]) => `<div class="stack" style="gap:8px"><div class="step">${l}</div>${hor(seg)}<button class="mini" style="align-self:flex-start" data-act="h-add" data-seg="${seg}">+ adicionar aula</button></div>`).join("")}
+      <h2 style="font-size:17px;margin-top:6px">Contato</h2>
+      <label class="f">WhatsApp da escola<input class="inp" id="c-wa" inputmode="tel" placeholder="5511999998888" value="${esc(c.whatsapp)}"></label>
+      <p class="note" style="margin:0">Só números, com o código do país (55) e o DDD. O botão WhatsApp some se este campo ficar vazio.</p>
+      <h2 style="font-size:17px;margin-top:6px">Proteção</h2>
+      <label class="f">PIN para abrir Gerenciar (opcional)<input class="inp" id="c-pin" type="password" inputmode="numeric" autocomplete="new-password" placeholder="${c.pinHash ? "PIN ativo. Digite um novo para trocar" : "Deixe vazio para não usar PIN"}"></label>
+      ${c.pinHash ? `<label style="display:flex;gap:8px;align-items:center;font-size:13.5px"><input type="checkbox" id="c-pin-off"> Remover o PIN</label>` : ""}
+      <button class="btn block" data-act="salvar-cfg">Salvar configurações</button>
+    </section>` : ""}
+    ${HOSTED ? `<section class="card stack">
+      <h2 style="font-size:17px">Instalar em outro aparelho</h2>
+      <ol class="steps">
+        <li><b>Computador (Chrome ou Edge):</b> abra este endereço e clique no ícone de instalar no fim da barra de endereço, ou no menu ⋮ → “Instalar ParqueTEC”.</li>
+        <li><b>Android (Chrome):</b> menu ⋮ → “Instalar app” ou “Adicionar à tela inicial”.</li>
+        <li><b>iPhone (Safari):</b> Compartilhar → “Adicionar à Tela de Início”.</li>
+      </ol>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="app-url" readonly value="${esc(location.href.split("#")[0])}" style="flex:1;min-width:200px"><button class="btn ghost sm" data-act="copiar-url">Copiar endereço</button></div>
+      ${installEvt ? `<button class="btn block" data-act="instalar">Instalar neste aparelho</button>` : ""}
+    </section>` : ""}
+    ${MODE === "firebase" && AUTH ? `<section class="card" style="display:flex;align-items:center;gap:10px"><div class="grow" style="flex:1;min-width:0"><div class="note">Conectado como${adm ? " · coordenação" : ""}</div><b style="overflow-wrap:anywhere">${esc(AUTH.email || "")}</b></div><button class="mini" data-act="mudar-senha">Mudar senha</button><button class="btn ghost sm" data-act="sair">Sair</button></section>` : ""}
+    <p class="note" style="text-align:center">${MODE === "local" ? "Modo de teste: dados só neste aparelho." : "Dados salvos na nuvem. Tudo que muda aqui aparece na hora nos outros aparelhos."}</p>`;
+}
+
+function vAcessos() {
+  const lista = S.acessos.slice().sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1);
+  return `<section class="card stack">
+    <div><h2 style="font-size:17px">Acessos ao app</h2><p class="note" style="margin:4px 0 0">Quem pode entrar no app. <b>Operador</b> retira, devolve, agenda e escreve recados. <b>Coordenação</b> também mexe em equipamentos, configurações e acessos.</p></div>
+    <div class="list">
+      ${CONF.dono ? `<div class="row"><div class="grow"><div class="t">${esc(CONF.dono)}</div><div class="s">Coordenação · conta principal</div></div></div>` : ""}
+      ${lista.map(a => `<div class="row"><div class="grow"><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.id)} · ${a.papel === "admin" ? "Coordenação" : "Operador"}</div></div>
+        ${a.id === meuEmail() ? `<span class="badge">você</span>` : `<button class="mini ${ui.armed === "ac:" + a.id ? "warn" : ""}" data-act="remover-acesso" data-id="${esc(a.id)}">${ui.armed === "ac:" + a.id ? "confirmar" : "remover"}</button>`}</div>`).join("")}
+    </div>
+    <div class="step">Dar acesso a alguém</div>
+    <label class="f">Nome<input class="inp" id="ac-nome" placeholder="Ex.: Kely Regina Maximo Vieira"></label>
+    <div class="grid2">
+      <label class="f">E-mail<input class="inp" id="ac-email" type="email" inputmode="email" placeholder="nome@escola.com"></label>
+      <label class="f">Senha inicial<input class="inp" id="ac-senha" type="text" autocomplete="off" placeholder="mínimo 6 caracteres"></label>
+    </div>
+    <label class="f">Perfil<select class="inp" id="ac-papel"><option value="operador">Operador</option><option value="admin">Coordenação</option></select></label>
+    <button class="btn block" data-act="dar-acesso">Dar acesso</button>
+    <p class="note" style="margin:0">Passe o e-mail e a senha para a pessoa. Ela pode trocar a senha depois, em Gerenciar → Mudar senha.</p>
+  </section>`;
+}
+
+/* ---------- Janelas (retirar, devolver, agendar, operador, parar) ---------- */
+const modal = { render: null, state: null,
+  open(fn, state) { this.render = fn; this.state = state; this.draw(true); },
+  close() { this.render = null; this.state = null; $("#modal").innerHTML = ""; document.body.style.overflow = ""; },
+  draw(first) {
+    if (!this.render) return;
+    const a = document.activeElement, fid = a && a.id, sel = a && "selectionStart" in a ? [a.selectionStart, a.selectionEnd] : null;
+    const sc = $("#modal .sheet") ? $("#modal .sheet").scrollTop : 0;
+    $("#modal").innerHTML = `<div class="ov" data-act="ov"><div class="sheet${first ? " anim" : ""}" role="dialog" aria-modal="true">${this.render(this.state)}</div></div>`;
+    document.body.style.overflow = "hidden";
+    const sh = $("#modal .sheet"); if (sh) sh.scrollTop = sc;
+    if (first) { const f = $("#modal [autofocus]"); if (f && matchMedia("(min-width:700px)").matches) f.focus(); }
+    else if (fid) { const el = document.getElementById(fid); if (el) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} } }
+  },
+  refresh() { if (this.state && this.state.live) this.draw(false); }
+};
+const head = (t) => `<div class="sheet-h"><h2>${t}</h2><button class="x" data-act="fechar" aria-label="Fechar">×</button></div>`;
+
+function personPicker(st, idp, opts = {}) {
+  if (st.pessoa) return `<div class="chosen"><div class="grow">${esc(st.pessoa.nome)}<div class="note" style="color:inherit;font-weight:500">${esc(st.pessoa.cargo || st.pessoa.tipo || "")}</div></div><button class="mini" data-act="pp-limpar">Trocar</button></div>`;
+  const q = norm(st.q);
+  let pool = S.pessoas.filter(p => p.ativo !== false && (!opts.soProf || p.tipo !== "Aluno"));
+  const hits = (q ? pool.filter(p => norm(p.nome + " " + (p.cargo || "")).includes(q)) : pool).slice(0, 8);
+  return `<input class="inp" id="${idp}" type="search" autocomplete="off" placeholder="Digite o nome" value="${esc(st.q || "")}" autofocus>
+    <div class="pick">${hits.map(p => `<button data-act="pp-escolher" data-id="${p.id}">${esc(p.nome)}<span class="s">${esc(p.cargo || p.tipo || "")}</span></button>`).join("")}
+    ${st.q && st.q.trim().length > 2 && !pool.some(p => norm(p.nome) === q) ? `<button data-act="pp-novo"><b>Usar “${esc(st.q.trim())}”</b><span class="s">e cadastrar como nova pessoa</span></button>` : ""}
+    ${!hits.length && !st.q ? `<span class="note">Ninguém cadastrado ainda. Digite o nome para cadastrar.</span>` : ""}</div>`;
+}
+
+function openRetirar(pref = {}) {
+  const tipo = pref.tipo || ui.tipo;
+  const st = { live: true, tipo, pessoa: pref.pessoa || null, q: "", fin: pref.fin || "Aula regular", turma: pref.turma || "", obs: "", sel: new Set(), qtd: "", resId: pref.resId || null, codeQ: "" };
+  if (pref.qtd) { disponiveis(tipo).slice(0, pref.qtd).forEach(c => st.sel.add(c)); }
+  modal.open(mRetirar, st);
+}
+function mRetirar(st) {
+  const disp = disponiveis(st.tipo);
+  for (const c of [...st.sel]) if (!disp.includes(c)) st.sel.delete(c);
+  const q = norm(st.codeQ).replace(/\s/g, "");
+  const shown = disp.filter(c => !q || norm(c).includes(q));
+  const n = st.sel.size;
+  return `${head("Retirar")}
+    ${tipoSeg("rt", st.tipo, "rt-tipo")}
+    <div class="step">1. Quem vai usar</div>
+    ${personPicker(st, "rt-q")}
+    <div class="step">2. Para quê</div>
+    <div class="grid2">
+      <label class="f">Finalidade<select class="inp" id="rt-fin">${FINS.map(f => `<option ${st.fin === f ? "selected" : ""}>${f}</option>`).join("")}</select></label>
+      <label class="f">Turma ou sala (opcional)<input class="inp" id="rt-turma" value="${esc(st.turma)}" placeholder="Ex.: 2º A"></label>
+    </div>
+    <div class="step">3. Quais equipamentos <span style="text-transform:none;letter-spacing:0;font-weight:600">· ${disp.length} disponíveis</span></div>
+    ${disp.length ? `<div class="stepper">
+      <span class="note">Separar</span>
+      <input class="inp" id="rt-qtd" type="number" min="1" max="${disp.length}" inputmode="numeric" placeholder="qtd." value="${esc(st.qtd)}">
+      <button class="mini" data-act="rt-auto">Escolher sozinho</button>
+      <button class="mini" data-act="rt-limpar" ${n ? "" : "disabled"}>Limpar</button>
+    </div>
+    <input class="inp" id="rt-code" type="search" placeholder="Ou toque nos códigos abaixo. Buscar: ex. 014" value="${esc(st.codeQ)}">
+    <div class="codes">${shown.map(c => `<button class="code" data-act="rt-code" data-v="${c}" aria-pressed="${st.sel.has(c)}">${c}</button>`).join("")}</div>`
+    : `<div class="sum">Nenhum ${TIPOS[st.tipo].um} disponível agora.</div>`}
+    <label class="f">Observação (opcional)<input class="inp" id="rt-obs" value="${esc(st.obs)}" placeholder="Ex.: levou carregadores"></label>
+    <div class="sum">${n ? `<b>${n} ${n === 1 ? TIPOS[st.tipo].um : TIPOS[st.tipo].nome.toLowerCase()}</b>: ${[...st.sel].sort().join(", ")}` : "Nenhum equipamento escolhido."}${opNome() ? `<br>Autorizado por ${esc(opNome())}` : ""}</div>
+    <button class="btn go block" data-act="rt-ok" ${n && st.pessoa ? "" : "disabled"}>Confirmar retirada</button>`;
+}
+
+function openDevolver(id) {
+  const st = { live: true, q: "", sel: new Set(), only: id || null };
+  const list = id ? S.abertos.filter(e => e.id === id) : S.abertos;
+  list.forEach(e => pendentes(e).forEach(c => st.sel.add(c)));
+  if (!id) st.sel.clear();
+  modal.open(mDevolver, st);
+}
+function mDevolver(st) {
+  const q = norm(st.q).replace(/\s/g, "");
+  let list = S.abertos.filter(e => pendentes(e).length);
+  if (st.only) list = list.filter(e => e.id === st.only);
+  const vivos = new Set(list.flatMap(pendentes));
+  for (const c of [...st.sel]) if (!vivos.has(c)) st.sel.delete(c);
+  const shown = list.filter(e => !q || norm(e.pessoaNome).replace(/\s/g, "").includes(q) || pendentes(e).some(c => norm(c).includes(q)));
+  const n = st.sel.size;
+  return `${head("Devolver")}
+    ${list.length ? `${st.only ? "" : `<input class="inp" id="dv-q" type="search" placeholder="Buscar pessoa ou código, ex.: NB-014" value="${esc(st.q)}" autofocus>`}
+    <div class="stack" style="gap:10px">${shown.map(e => { const pend = pendentes(e); const all = pend.every(c => st.sel.has(c)); return `<div class="card" style="padding:12px">
+        <div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="t" style="font-weight:700">${esc(e.pessoaNome)}</div><div class="note">${TIPOS[e.tipo].nome} · ${esc(e.finalidade)} · retirou ${dayKey(new Date(e.retiradoEm)) === dayKey() ? "às" : "em " + fmtLong.format(new Date(e.retiradoEm)) + ","} ${hhmm(e.retiradoEm)}</div></div>
+        <button class="mini" data-act="dv-todos" data-id="${e.id}">${all ? "Desmarcar" : "Marcar todos"}</button></div>
+        <div class="codes" style="margin-top:8px;max-height:none">${pend.map(c => `<button class="code" data-act="dv-code" data-v="${c}" aria-pressed="${st.sel.has(c)}">${c}</button>`).join("")}</div></div>`; }).join("") || `<span class="note">Nada encontrado.</span>`}</div>
+    <div class="sum">${n ? `<b>${n} para devolver</b>: ${[...st.sel].sort().join(", ")}` : "Toque nos códigos que estão sendo devolvidos."}</div>
+    <button class="btn back block" data-act="dv-ok" ${n ? "" : "disabled"}>Confirmar devolução</button>`
+    : `<div class="empty">Tudo devolvido. Nada pendente.</div>`}`;
+}
+
+function openAgendar(i) { modal.open(mAgendar, { live: true, aula: i, pessoa: null, q: "", qtd: "", turma: "", obs: "" }); }
+function mAgendar(st) {
+  const a = (cfg().horarios[ui.seg] || [])[st.aula]; if (!a) return head("Agendar");
+  const s = stats(ui.tipo), livres = Math.max(0, s.parque - s.manut - reservadosSlot(ui.tipo, ui.seg, st.aula));
+  return `${head("Agendar")}
+    <div class="sum"><b>${TIPOS[ui.tipo].nome}</b> · ${SEGS[ui.seg]} · ${esc(a.nome)} (${esc(a.ini)} às ${esc(a.fim)})<br>${esc(fmtLong.format(keyToDate(ui.date)))} · ${livres} livres</div>
+    <div class="step">Para quem</div>
+    ${personPicker(st, "ag-q", { soProf: true })}
+    <div class="grid2">
+      <label class="f">Quantidade<input class="inp" id="ag-qtd" type="number" min="1" max="${livres}" inputmode="numeric" value="${esc(st.qtd)}" placeholder="até ${livres}"></label>
+      <label class="f">Turma<input class="inp" id="ag-turma" value="${esc(st.turma)}" placeholder="Ex.: 3º B"></label>
+    </div>
+    <label class="f">Observação (opcional)<input class="inp" id="ag-obs" value="${esc(st.obs)}" placeholder="Ex.: atividade de pesquisa"></label>
+    <button class="btn go block" data-act="ag-ok">Confirmar agendamento</button>`;
+}
+
+function openOperador() { modal.open(mOperador, { live: true, pessoa: null, q: "" }); }
+function mOperador(st) {
+  return `${head("Quem está usando o app?")}
+    <p class="note" style="margin:0">O nome escolhido aparece como “autorizado por” nas retiradas e devoluções feitas neste aparelho.</p>
+    ${personPicker(st, "op-q", { soProf: true })}
+    <button class="btn block" data-act="op-ok" ${st.pessoa ? "" : "disabled"}>Confirmar</button>`;
+}
+
+function openParar(code) { const p = paradosMap().get(code); modal.open(mParar, { code, estado: p ? p.estado : "manut", motivo: p ? p.motivo || "" : "", atual: p || null }); }
+function mParar(st) {
+  const e = emUsoMap().get(st.code);
+  return `${head("Parar " + st.code)}
+    ${st.atual ? `<div class="sum">Hoje: <b>${st.atual.estado === "baixa" ? "baixado" : "em manutenção"}</b>${st.atual.motivo ? " · " + esc(st.atual.motivo) : ""}</div>` : ""}
+    ${e ? `<div class="sum">Está com <b>${esc(e.pessoaNome)}</b>. Ao registrar, a devolução é feita sozinha.</div>` : ""}
+    <div class="seg" role="group"><button data-act="pr-estado" data-v="manut" aria-pressed="${st.estado === "manut"}">Manutenção</button><button data-act="pr-estado" data-v="baixa" aria-pressed="${st.estado === "baixa"}">Baixa</button></div>
+    <label class="f">Motivo<textarea class="inp" id="pr-motivo" placeholder="Tela trincada, não liga, furto…">${esc(st.motivo)}</textarea></label>
+    <button class="btn block" data-act="pr-ok">${st.estado === "baixa" ? "Registrar baixa" : "Registrar manutenção"}</button>
+    ${st.atual ? `<button class="btn ghost block" data-act="desfazer" data-id="${st.code}">Voltar ao parque</button>` : ""}`;
+}
+
+/* ---------- Ações ---------- */
+async function novaPessoa(nome, extra = {}) {
+  const p = { nome: nome.trim(), tipo: extra.tipo || "Profissional", cargo: extra.cargo || "", ativo: true, criadoEm: Date.now() };
+  const ref = DB.collection("pessoas").doc();
+  const ok = await write(() => ref.set(p));
+  return ok ? { id: ref.id, ...p } : null;
+}
+
+async function registrarDevolucao(codes, nota) {
+  const groups = new Map(), uso = emUsoMap();
+  for (const c of codes) { const e = uso.get(c); if (e) { if (!groups.has(e.id)) groups.set(e.id, { e, codes: [] }); groups.get(e.id).codes.push(c); } }
+  const agora = Date.now();
+  for (const { e, codes: cs } of groups.values()) {
+    const dev = {}; cs.forEach(c => dev[c] = { em: agora, por: opNome(), ...(nota ? { nota } : {}) });
+    const resta = pendentes(e).filter(c => !cs.includes(c));
+    const patch = { devolvidos: dev };
+    if (!resta.length) { patch.aberto = false; patch.devolvidoEm = agora; }
+    const ok = await write(() => DB.doc("emprestimos/" + e.id).update(patch));
+    if (!ok) return false;
+  }
+  return true;
+}
+
+const acts = {
+  tab(t) { ui.tab = t.dataset.v; store.set("tab", ui.tab); ui.armed = null; if (ui.tab === "recados") store.set("recadosVistos", Date.now()); render(); window.scrollTo(0, 0); },
+  wa() {},
+  tipo(t) { ui.tipo = t.dataset.v; render(); },
+  seg(t) { ui.seg = t.dataset.v; store.set("seg", ui.seg); render(); },
+  dia(t) { const d = keyToDate(ui.date); d.setDate(d.getDate() + Number(t.dataset.v)); ui.date = dayKey(d); subscribeReservas(); render(); },
+  operador() { openOperador(); },
+  retirar() { if (!S.config) return toast("Primeiro diga quantos equipamentos a escola tem."); if (!operador) toast("Dica: toque em Trocar, no topo, para registrar quem está autorizando."); openRetirar(); },
+  devolver(t) { openDevolver(t.dataset.id); },
+  fechar() { modal.close(); },
+  ov(t, ev) { if (ev.target === t) modal.close(); },
+
+  async setup() {
+    const nb = Math.max(0, Math.min(200, parseInt($("#setup-nb").value) || 0)), tb = Math.max(0, Math.min(200, parseInt($("#setup-tb").value) || 0));
+    if (!nb && !tb) return toast("Coloque pelo menos um número.");
+    await write(() => DB.doc("config/main").set({ ...defaultConfig(), notebooks: nb, tablets: tb, criadoEm: Date.now() }), "Pronto! Equipamentos criados.");
+  },
+
+  /* seletor de pessoa */
+  "pp-escolher"(t) { modal.state.pessoa = pessoa(t.dataset.id); modal.draw(); },
+  "pp-limpar"() { modal.state.pessoa = null; modal.state.q = ""; modal.draw(true); },
+  async "pp-novo"() { const st = modal.state; const p = await novaPessoa(st.q, { tipo: "Profissional" }); if (p && modal.state === st) { st.pessoa = p; modal.draw(); toast("Pessoa cadastrada"); } },
+
+  /* retirar */
+  "rt-tipo"(t) { modal.state.tipo = t.dataset.v; modal.state.sel.clear(); modal.draw(); },
+  "rt-code"(t) { const s = modal.state.sel, c = t.dataset.v; s.has(c) ? s.delete(c) : s.add(c); modal.draw(); },
+  "rt-auto"() { const st = modal.state, n = parseInt(st.qtd) || 0; if (n < 1) return toast("Digite a quantidade primeiro."); st.sel.clear(); disponiveis(st.tipo).slice(0, n).forEach(c => st.sel.add(c)); if (st.sel.size < n) toast(`Só há ${st.sel.size} disponíveis.`); modal.draw(); },
+  "rt-limpar"() { modal.state.sel.clear(); modal.draw(); },
+  async "rt-ok"(t) {
+    const st = modal.state; if (!st.pessoa || !st.sel.size) return;
+    const disp = new Set(disponiveis(st.tipo)), codes = [...st.sel].filter(c => disp.has(c)).sort();
+    if (codes.length !== st.sel.size) { toast("Alguns equipamentos acabaram de ser retirados em outro aparelho. Confira a seleção."); return modal.draw(); }
+    t.disabled = true;
+    const e = { aberto: true, tipo: st.tipo, codes, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, pessoaCargo: st.pessoa.cargo || "", finalidade: st.fin, turma: st.turma.trim(), obs: st.obs.trim(), retiradoEm: Date.now(), operador: opNome(), devolvidos: {}, devolvidoEm: null, ...(st.resId ? { reservaId: st.resId } : {}) };
+    const ok = await write(() => DB.collection("emprestimos").doc().set(e), `${codes.length} ${codes.length === 1 ? TIPOS[st.tipo].um + " retirado" : TIPOS[st.tipo].nome.toLowerCase() + " retirados"} por ${st.pessoa.nome.split(" ")[0]}`);
+    if (ok) { modal.close(); if (ui.tab !== "painel" && ui.tab !== "agenda") { ui.tab = "painel"; render(); } } else t.disabled = false;
+  },
+
+  /* devolver */
+  "dv-code"(t) { const s = modal.state.sel, c = t.dataset.v; s.has(c) ? s.delete(c) : s.add(c); modal.draw(); },
+  "dv-todos"(t) { const e = S.abertos.find(x => x.id === t.dataset.id); if (!e) return; const s = modal.state.sel, pend = pendentes(e), all = pend.every(c => s.has(c)); pend.forEach(c => all ? s.delete(c) : s.add(c)); modal.draw(); },
+  async "dv-ok"(t) { const codes = [...modal.state.sel]; t.disabled = true; if (await registrarDevolucao(codes)) { toast(`${codes.length} ${codes.length === 1 ? "equipamento devolvido" : "equipamentos devolvidos"}`); modal.close(); } else t.disabled = false; },
+
+  /* agenda */
+  agendar(t) { openAgendar(Number(t.dataset.i)); },
+  async "ag-ok"(t) {
+    const st = modal.state, qtd = parseInt(st.qtd) || 0;
+    const s = stats(ui.tipo), livres = s.parque - s.manut - reservadosSlot(ui.tipo, ui.seg, st.aula);
+    if (!st.pessoa) return toast("Escolha para quem é o agendamento.");
+    if (qtd < 1) return toast("Digite a quantidade.");
+    if (qtd > livres) return toast(`Só há ${livres} livres nesse horário.`);
+    t.disabled = true;
+    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, aulaNome: cfg().horarios[ui.seg][st.aula].nome, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() };
+    if (await write(() => DB.collection("reservas").doc().set(r), "Agendado")) modal.close(); else t.disabled = false;
+  },
+  async "cancelar-res"(t) { const k = "res:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("reservas/" + t.dataset.id).delete(), "Agendamento cancelado"); },
+  "retirar-res"(t) { const r = S.reservas.find(x => x.id === t.dataset.id); if (!r) return; openRetirar({ tipo: r.tipo, pessoa: pessoa(r.pessoaId) || { id: r.pessoaId, nome: r.pessoaNome }, fin: "Agendamento", turma: r.turma, qtd: r.qtd, resId: r.id }); },
+
+  /* operador */
+  "op-ok"() { const p = modal.state.pessoa; if (!p) return; operador = { id: p.id, nome: p.nome, cargo: p.cargo || "" }; store.set("operador", operador); modal.close(); render(); toast(`Olá, ${p.nome.split(" ")[0]}!`); },
+
+  /* recados */
+  async "enviar-rec"(t) { const el = $("#recado-txt"), txt = el.value.trim(); if (!txt) return toast("Escreva o recado primeiro."); t.disabled = true; if (await write(() => DB.collection("recados").doc().set({ texto: txt.slice(0, 2000), autor: opNome(), autorId: operador ? operador.id : "", em: Date.now(), fixado: false }), "Recado publicado")) { el.value = ""; store.set("recadosVistos", Date.now()); } t.disabled = false; },
+  async fixar(t) { const r = S.recados.find(x => x.id === t.dataset.id); if (r) await write(() => DB.doc("recados/" + r.id).update({ fixado: !r.fixado })); },
+  async "apagar-rec"(t) { const k = "rec:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("recados/" + t.dataset.id).delete(), "Recado apagado"); },
+
+  /* histórico */
+  "mais-hist"() { ui.histLimit += 300; subscribeHist(); },
+  async planilha() {
+    const rows = [["Data", "Hora da retirada", "Tipo", "Equipamento", "Pessoa", "Cargo/turma da pessoa", "Turma/sala", "Finalidade", "Autorizado por", "Situação", "Devolvido em", "Recebido por", "Observação"]];
+    for (const e of S.hist.slice().reverse()) for (const c of e.codes || []) {
+      const d = (e.devolvidos || {})[c], dt = new Date(e.retiradoEm);
+      rows.push([fmtLong.format(dt), hhmm(e.retiradoEm), TIPOS[e.tipo] ? TIPOS[e.tipo].um : e.tipo, c, e.pessoaNome, e.pessoaCargo || "", e.turma || "", e.finalidade, e.operador || "", d ? "devolvido" : "em uso", d ? `${dayKey(new Date(d.em)).split("-").reverse().join("/")} ${hhmm(d.em)}` : "", d ? d.por || "" : "", [e.obs, d && d.nota].filter(Boolean).join(" · ")]);
+    }
+    const csv = "﻿" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    try { await downloads.save({ filename: `historico-equipamentos-${dayKey()}.csv`, data: csv }); toast("Planilha salva"); }
+    catch (e) { if (!e || e.code !== "declined") toast("Não deu para baixar a planilha aqui."); }
+  },
+
+  /* gerenciar */
+  async desbloquear() { const v = $("#pin-in").value; if (await sha(v) === cfg().pinHash) { ui.unlocked = true; render(); } else toast("PIN errado."); },
+  "ger-tipo"(t) { ui.gerTipo = t.dataset.v; ui.gerQ = ""; render(); },
+  parar(t) { openParar(t.dataset.v); },
+  "pr-estado"(t) { modal.state.motivo = $("#pr-motivo").value; modal.state.estado = t.dataset.v; modal.draw(); },
+  async "pr-ok"(t) {
+    const st = modal.state, motivo = $("#pr-motivo").value.trim(); t.disabled = true;
+    if (emUsoMap().has(st.code) && !(await registrarDevolucao([st.code], "devolução automática ao parar o equipamento"))) { t.disabled = false; return; }
+    if (await write(() => DB.doc("parados/" + st.code).set({ tipo: st.code.slice(0, 2), estado: st.estado, motivo, em: Date.now(), por: opNome() }), st.estado === "baixa" ? `Baixa de ${st.code} registrada` : `${st.code} em manutenção`)) modal.close(); else t.disabled = false;
+  },
+  async desfazer(t) { const id = t.dataset.id; if (await write(() => DB.doc("parados/" + id).delete(), `${id} voltou ao parque`)) if (modal.state && modal.state.code === id) modal.close(); },
+  async "cad-pessoa"() {
+    const nome = $("#p-nome").value.trim(); if (nome.length < 3) return toast("Digite o nome completo.");
+    if (S.pessoas.some(p => norm(p.nome) === norm(nome) && p.ativo !== false)) return toast("Essa pessoa já está cadastrada.");
+    if (await novaPessoa(nome, { tipo: $("#p-tipo").value, cargo: $("#p-cargo").value.trim() })) { toast("Pessoa cadastrada"); $("#p-nome").value = ""; $("#p-cargo").value = ""; }
+  },
+  async "cad-lote"(t) {
+    const tipo = $("#p-lote-tipo").value, ja = new Set(S.pessoas.map(p => norm(p.nome)));
+    const linhas = $("#p-lote").value.split(/\r?\n/).map(l => l.split(/[;\t]/).map(x => x.trim())).filter(([n]) => n && n.length > 2 && !ja.has(norm(n)));
+    if (!linhas.length) return toast("Nenhum nome novo na lista.");
+    t.disabled = true; let n = 0;
+    for (const [nome, cargo] of linhas) { if (!(await novaPessoa(nome, { tipo, cargo: cargo || "" }))) break; n++; ja.add(norm(nome)); }
+    toast(`${n} ${n === 1 ? "pessoa cadastrada" : "pessoas cadastradas"}`); const el = $("#p-lote"); if (el) el.value = ""; t.disabled = false;
+  },
+  "editar-p"(t) { ui.editP = t.dataset.id || null; render(); },
+  async "salvar-p"(t) { const nome = $("#e-nome").value.trim(); if (nome.length < 3) return toast("Digite o nome completo."); if (await write(() => DB.doc("pessoas/" + t.dataset.id).update({ nome, cargo: $("#e-cargo").value.trim(), tipo: $("#e-tipo").value }), "Dados atualizados")) { ui.editP = null; render(); } },
+  async "desativar-p"(t) { const k = "p:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("pessoas/" + t.dataset.id).update({ ativo: false }), "Pessoa desativada. O histórico dela continua salvo."); },
+  async "reativar-p"(t) { await write(() => DB.doc("pessoas/" + t.dataset.id).update({ ativo: true }), "Pessoa reativada"); },
+  "ver-inativos"() { ui.showInativos = !ui.showInativos; render(); },
+  "h-add"(t) { const seg = t.dataset.seg; const c = readCfgForm(); const l = c.horarios[seg]; const last = l[l.length - 1]; l.push({ nome: `${l.length + 1}ª aula`, ini: last ? last.fim : "07:00", fim: "" }); S.config = c; ui.noKeep = true; render(); },
+  "h-del"(t) { const c = readCfgForm(); c.horarios[t.dataset.seg].splice(Number(t.dataset.i), 1); S.config = c; ui.noKeep = true; render(); },
+  async login(t) {
+    const email = $("#lg-email").value.trim(), senha = $("#lg-senha").value;
+    if (!email || !senha) return toast("Preencha e-mail e senha.");
+    t.disabled = true; store.set("email", email);
+    try { await FB.login(email, senha); }
+    catch (e) {
+      const c = e && e.code || "";
+      toast(/invalid|wrong|not-found|user-disabled/.test(c) ? "E-mail ou senha incorretos." : /too-many/.test(c) ? "Muitas tentativas. Espere alguns minutos." : "Não deu para entrar. Confira a internet.", 5000);
+      t.disabled = false;
+    }
+  },
+  async esqueci() {
+    const email = $("#lg-email").value.trim(); if (!email) return toast("Digite seu e-mail primeiro.");
+    try { await FB.reset(email); toast("Enviamos um link para criar uma nova senha no seu e-mail.", 5000); } catch { toast("Não deu para enviar. Confira o e-mail digitado."); }
+  },
+  async sair() { if (FB) await FB.logout(); },
+  primeiro() { ui.primeiro = true; render(); },
+  "voltar-login"() { ui.primeiro = false; render(); },
+  async "criar-dono"(t) {
+    const s1 = $("#pa-senha").value, s2 = $("#pa-senha2").value;
+    if (s1.length < 6) return toast("A senha precisa ter pelo menos 6 caracteres.");
+    if (s1 !== s2) return toast("As duas senhas não são iguais.");
+    t.disabled = true;
+    try { await FB.criarDono(CONF.dono, s1); ui.primeiro = false; store.set("email", CONF.dono); }
+    catch (e) { toast(e && e.code === "auth/email-already-in-use" ? "Essa conta já existe. Volte e entre com a senha, ou use “Esqueci a senha”." : "Não deu para criar a conta. Confira a internet.", 6000); t.disabled = false; }
+  },
+  async "ja-confirmei"() {
+    try { const u = await FB.recarregar(); if (u.emailVerified) { ui.verificar = false; stopAll(); subscribeAll(); render(); } else toast("Ainda não aparece como confirmado. Toque no link do e-mail e tente de novo."); }
+    catch { toast("Não deu para conferir agora. Confira a internet."); }
+  },
+  async reenviar() { try { await FB.reenviar(); toast("Link enviado de novo."); } catch { toast("Espere alguns minutos antes de pedir outro link."); } },
+  async "mudar-senha"() { try { await FB.reset(AUTH.email); toast("Mandamos um link para criar a nova senha no seu e-mail.", 5000); } catch { toast("Não deu para enviar agora."); } },
+  async "dar-acesso"(t) {
+    const nome = $("#ac-nome").value.trim(), email = $("#ac-email").value.trim().toLowerCase(), senha = $("#ac-senha").value, papel = $("#ac-papel").value;
+    if (nome.length < 3) return toast("Digite o nome da pessoa.");
+    if (!/^[^@\s/]+@[^@\s/]+\.[^@\s/]+$/.test(email)) return toast("Digite um e-mail válido.");
+    if (senha.length < 6) return toast("A senha inicial precisa ter pelo menos 6 caracteres.");
+    t.disabled = true;
+    let novo;
+    try { novo = await FB.criarConta(email, senha); }
+    catch (e) { t.disabled = false; return toast(e && e.code === "auth/invalid-email" ? "Esse e-mail não é válido." : e && e.code === "auth/weak-password" ? "Senha fraca demais. Use pelo menos 6 caracteres." : "Não deu para criar o login. Confira a internet.", 5000); }
+    if (await write(() => DB.doc("acessos/" + email).set({ nome, papel, criadoEm: Date.now(), criadoPor: meuEmail() }),
+      novo ? `Acesso criado para ${nome.split(" ")[0]}. Passe o e-mail e a senha para a pessoa.` : `${nome.split(" ")[0]} já tinha login: ela entra com a senha que já usa, ou toca em “Esqueci a senha”.`)) {
+      ["#ac-nome", "#ac-email", "#ac-senha"].forEach(id => { const el = $(id); if (el) el.value = ""; });
+    }
+    t.disabled = false;
+  },
+  async "remover-acesso"(t) { const k = "ac:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("acessos/" + t.dataset.id).delete(), "Acesso removido. A pessoa não entra mais no app."); },
+  async instalar() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; render(); },
+  "instalar-depois"() { store.set("installDispensado", true); render(); },
+  async "copiar-url"() { const el = $("#app-url"); try { await navigator.clipboard.writeText(el.value); toast("Endereço copiado. Mande pelo WhatsApp para quem vai usar."); } catch { el.select(); toast("Selecione e copie o endereço."); } },
+  async "salvar-cfg"() {
+    const c = readCfgForm(), pin = $("#c-pin").value.trim(), off = $("#c-pin-off");
+    if (off && off.checked) c.pinHash = ""; else if (pin) { if (pin.length < 4) return toast("Use um PIN de pelo menos 4 dígitos."); c.pinHash = await sha(pin); ui.unlocked = true; }
+    const { id, ...body } = c;
+    await write(() => DB.doc("config/main").set(body), "Configurações salvas");
+  }
+};
+function readCfgForm() {
+  const c = JSON.parse(JSON.stringify(cfg()));
+  const num = (id, d) => { const el = $(id); return el ? Math.max(0, Math.min(200, parseInt(el.value) || 0)) : d; };
+  c.notebooks = num("#c-nb", c.notebooks); c.tablets = num("#c-tb", c.tablets);
+  const wa = $("#c-wa"); if (wa) c.whatsapp = wa.value.replace(/\D/g, "");
+  for (const seg of Object.keys(SEGS)) c.horarios[seg] = (c.horarios[seg] || []).map((a, i) => {
+    const g = (f) => { const el = $(`#h-${seg}-${i}-${f}`); return el ? el.value.trim() : a[f]; };
+    return { nome: g("nome") || a.nome, ini: g("ini"), fim: g("fim") };
+  });
+  return c;
+}
+
+/* ---------- Eventos ---------- */
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-act]"); if (!t) return;
+  const a = t.dataset.act; if (!acts[a]) return;
+  if (a === "ov" && ev.target !== t) return;
+  if (a !== "wa") ev.preventDefault();
+  if (!/^(cancelar-res|apagar-rec|desativar-p|remover-acesso)$/.test(a) && ui.armed) { ui.armed = null; if (!t.closest("#modal")) render(); }
+  acts[a](t, ev);
+});
+document.addEventListener("input", (ev) => {
+  const t = ev.target, id = t.id, st = modal.state;
+  const pp = { "rt-q": 1, "ag-q": 1, "op-q": 1 };
+  if (pp[id] && st) { st.q = t.value; return modal.draw(); }
+  if (id === "rt-code" && st) { st.codeQ = t.value; return modal.draw(); }
+  if (id === "dv-q" && st) { st.q = t.value; return modal.draw(); }
+  if (st) { const map = { "rt-turma": "turma", "rt-obs": "obs", "rt-qtd": "qtd", "ag-qtd": "qtd", "ag-turma": "turma", "ag-obs": "obs", "pr-motivo": "motivo" }; if (map[id]) st[map[id]] = t.value; }
+  if (id === "hist-q") { ui.histQ = t.value; render(); }
+  if (id === "ger-q") { ui.gerQ = t.value; render(); }
+});
+document.addEventListener("change", (ev) => {
+  const t = ev.target;
+  if (t.id === "rt-fin" && modal.state) modal.state.fin = t.value;
+  if (t.id === "agenda-date" && t.value) { ui.date = t.value; subscribeReservas(); render(); }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && modal.render) modal.close();
+  if (ev.key === "Enter" && ev.target.id === "pin-in") acts.desbloquear();
+  if (ev.key === "Enter" && ev.target.id === "lg-senha") acts.login($('[data-act="login"]'));
+  if (ev.key === "Enter" && ev.target.id === "rt-qtd") { ev.preventDefault(); acts["rt-auto"](); }
+});
+
+let toastT;
+function toast(msg, ms = 2800) {
+  let el = $(".toast"); if (!el) { el = document.createElement("div"); el.className = "toast"; el.setAttribute("role", "status"); document.body.appendChild(el); }
+  el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, ms);
+}
+
+/* ---------- Início ---------- */
+function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [] }); ui.semAcesso = false; }
+async function boot() {
+  const conf = HOSTED && window.PARQUETEC_FIREBASE;
+  if (HOSTED) {
+    // Fora do claude.ai a planilha é baixada direto pelo navegador.
+    downloads = { save: async ({ filename, data }) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "text/csv;charset=utf-8" })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); } };
+    window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; scheduleRender(); });
+    window.addEventListener("appinstalled", () => { installEvt = null; toast("App instalado! Procure o ícone do ParqueTEC."); scheduleRender(); });
+    if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  if (conf && conf.apiKey) {
+    try { FB = await firebaseDB(conf); }
+    catch (e) { console.warn(e); $("#main").innerHTML = `<div class="card empty">Não deu para abrir o app. Confira a internet e <button class="link" onclick="location.reload()">tente de novo</button>.</div>`; return; }
+    DB = FB.db; MODE = "firebase";
+    FB.onAuth(u => {
+      ui.authReady = true;
+      if (!u) { AUTH = null; ui.verificar = false; stopAll(); return render(); }
+      const trocou = !AUTH || AUTH.uid !== u.uid;
+      AUTH = u;
+      // A coordenação (dono) precisa confirmar o e-mail antes de entrar: é isso que as regras do Firebase exigem.
+      if (souDono() && !u.emailVerified) { ui.verificar = true; stopAll(); return render(); }
+      ui.verificar = false;
+      if (trocou || !Object.keys(unsub).length) { stopAll(); subscribeAll(); }
+      render();
+    });
+  } else {
+    let cloud = null;
+    if (!HOSTED) {
+      try { cloud = await window.claude.use("db"); } catch { cloud = null; }
+      try { downloads = await window.claude.use("downloads"); } catch { downloads = null; }
+    }
+    if (cloud) { DB = cloud; MODE = "claude"; } else { DB = localDB(); MODE = "local"; }
+    subscribeAll();
+  }
+  setInterval(() => { const k = dayKey(); if (k !== boot.day) { if (ui.date === boot.day) { ui.date = k; subscribeReservas(); } boot.day = k; render(); } }, 60000);
+  boot.day = dayKey();
+}
+render();
+boot();
+})();
+</script>
+<!--pwa--></body>
+</html>
+<!--/pwa-->
