@@ -13,6 +13,7 @@ igual a um aplicativo. Não tem nada para baixar de loja.
 - **Recados**: mural para a equipe, com recados fixados.
 - **Histórico**: busca por equipamento, pessoa ou turma, e baixa uma planilha que abre no Excel.
 - **Gerenciar**: pessoas (uma a uma ou colando uma lista), acessos ao app, manutenção e baixa de equipamentos, quantidade de equipamentos, horários das aulas e WhatsApp da escola.
+- **Impressão** (Gerenciar → Equipamentos → Inventário): lista de equipamentos com logo, data, modelo, patrimônio, local e situação (todos, ou só disponíveis, em uso, em manutenção ou baixados), com coluna para conferência e campo de assinatura; e etiquetas com o logo para colar nos aparelhos. Na janela de impressão dá para escolher “Salvar como PDF”.
 
 ## Tudo se faz pelo app
 

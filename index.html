@@ -232,7 +232,23 @@ nav.tabs .pip{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;heig
   body{background:#fff!important}
   body::before{display:none!important}
   body>*:not(#print){display:none!important}
-  #print{display:grid!important;grid-template-columns:repeat(3,1fr)}
+  #print{display:block!important;color:#111;font-family:var(--f-body)}
+  .etqs{display:grid;grid-template-columns:repeat(3,1fr)}
+  .lst-h{display:flex;align-items:center;gap:4mm;margin-bottom:4mm}
+  .lst-h img{width:16mm;height:16mm;object-fit:contain}
+  .lst-h h1{font-family:var(--f-display);font-size:16pt;margin:0}
+  .lst-h p{margin:1mm 0 0;font-size:8.5pt;color:#444}
+  .lst-res{font-size:9pt;margin:0 0 3mm}
+  .lst{width:100%;border-collapse:collapse;font-size:8.5pt}
+  .lst th,.lst td{border:1px solid #bbb;padding:1.2mm 1.6mm;text-align:left;vertical-align:top}
+  .lst th{background:#eee;font-weight:700}
+  .lst thead{display:table-header-group}
+  .lst tr{break-inside:avoid}
+  .lst .g td{background:#f4f1ea;font-weight:700;font-size:9pt}
+  .lst .ok{width:7mm}
+  .lst .st{font-weight:700}
+  .lst-ass{display:flex;gap:10mm;margin-top:8mm;font-size:9pt}
+  .lst-ass span{flex:1;border-top:1px solid #333;padding-top:1mm}
   .etq{display:flex;align-items:center;gap:3mm;height:27mm;padding:2mm 3mm;border:1px dashed #999;break-inside:avoid;color:#111;font-family:var(--f-body)}
   .etq img{width:15mm;height:15mm;object-fit:contain;flex:none}
   .etq b{display:block;font-family:var(--f-display);font-size:19pt;line-height:1}
@@ -1010,6 +1026,11 @@ function vInventario() {
     <div><h2 style="font-size:17px">Inventário</h2><p class="note" style="margin:4px 0 0">${com ? `${com} equipamentos com modelo e patrimônio. Toque num código acima para corrigir os dados dele.` : "Importe a planilha do inventário para guardar o modelo, o patrimônio e o local de cada equipamento."}</p></div>
     ${blocoImportar()}
     <div style="display:flex;gap:8px;flex-wrap:wrap">${downloads ? `<button class="btn ghost sm" data-act="inv-baixar">Baixar inventário</button>` : ""}${HOSTED ? `<button class="btn ghost sm" data-act="etiquetas">Imprimir etiquetas com o logo</button>` : ""}</div>
+    ${HOSTED ? `<div class="imp"><b>Imprimir lista de equipamentos</b>
+      <span class="note">Folha com o logo, a data e cada equipamento: modelo, patrimônio, local e situação (disponível, em uso com quem, manutenção ou baixa). Tem uma coluna em branco para conferir no inventário. Para gerar PDF, escolha “Salvar como PDF” na janela de impressão.</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"><label class="f" style="flex:1;min-width:170px">O que imprimir<select class="inp" id="lista-filtro">
+        <option value="todos">Todos os equipamentos</option><option value="disp">Só os disponíveis</option><option value="uso">Só os em uso</option><option value="manut">Só os em manutenção</option><option value="baixa">Só os baixados (inativos)</option><option value="parados">Manutenção e baixados</option></select></label>
+      <button class="btn" data-act="lista-imprimir">Imprimir lista</button></div></div>` : ""}
   </section>`;
 }
 
@@ -1399,8 +1420,35 @@ const acts = {
     const par = paradosMap(), codes = [...codesFor("NB"), ...codesFor("TB")].filter(c => (par.get(c) || {}).estado !== "baixa");
     if (!codes.length) return toast("Nenhum equipamento para etiquetar.");
     let el = $("#print"); if (!el) { el = document.createElement("div"); el.id = "print"; document.body.appendChild(el); }
-    el.innerHTML = codes.map(c => { const i = inv(c); return `<div class="etq"><img src="icons/cog-bulb.png" alt=""><div><b>${c}</b><span>${esc(i.modelo || "")}</span><span>${i.patrimonio ? "Patrimônio " + esc(i.patrimonio) : ""}</span><small>COG · Ensino Integral</small></div></div>`; }).join("");
+    el.innerHTML = `<div class="etqs">` + codes.map(c => { const i = inv(c); return `<div class="etq"><img src="icons/cog-bulb.png" alt=""><div><b>${c}</b><span>${esc(i.modelo || "")}</span><span>${i.patrimonio ? "Patrimônio " + esc(i.patrimonio) : ""}</span><small>COG · Ensino Integral</small></div></div>`; }).join("") + `</div>`;
     try { await Promise.all([...el.querySelectorAll("img")].slice(0, 1).map(img => img.decode())); } catch {}
+    window.print();
+  },
+  async "lista-imprimir"() {
+    const filtro = ($("#lista-filtro") || {}).value || "todos", par = paradosMap(), uso = emUsoMap();
+    const data = (t) => t ? `${dayKey(new Date(t)).split("-").reverse().join("/")}` : "";
+    const sit = (c) => {
+      const p = par.get(c), e = uso.get(c);
+      if (p && p.estado === "baixa") return { k: "baixa", t: "Baixado", d: [p.motivo, data(p.em)].filter(Boolean).join(" · ") };
+      if (p) return { k: "manut", t: "Manutenção", d: [p.motivo, p.em && "desde " + data(p.em)].filter(Boolean).join(" · ") };
+      if (e) return { k: "uso", t: "Em uso", d: `${e.pessoaNome}${e.turma ? " · " + e.turma : ""} · desde ${data(e.retiradoEm)} ${hhmm(e.retiradoEm)}` };
+      return { k: "disp", t: "Disponível", d: "" };
+    };
+    const quer = (k) => filtro === "todos" || filtro === k || (filtro === "parados" && (k === "manut" || k === "baixa"));
+    const todos = [...codesFor("NB"), ...codesFor("TB")], linhas = todos.map(c => ({ c, i: inv(c), s: sit(c) })).filter(x => quer(x.s.k));
+    if (!linhas.length) return toast("Nenhum equipamento nessa situação.");
+    const conta = { disp: 0, uso: 0, manut: 0, baixa: 0 }; todos.forEach(c => conta[sit(c).k]++);
+    const grupos = new Map(); for (const x of linhas) { const g = `${TIPOS[x.c.slice(0, 2)].nome} · ${x.i.modelo || "Sem modelo"}`; if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push(x); }
+    const titulos = { todos: "Todos os equipamentos", disp: "Equipamentos disponíveis", uso: "Equipamentos em uso", manut: "Equipamentos em manutenção", baixa: "Equipamentos baixados (inativos)", parados: "Equipamentos em manutenção e baixados" };
+    const agora = new Date();
+    let el = $("#print"); if (!el) { el = document.createElement("div"); el.id = "print"; document.body.appendChild(el); }
+    el.innerHTML = `<div class="lst-h"><img src="icons/cog-bulb.png" alt=""><div><h1>${titulos[filtro]}</h1><p>COG · Ensino Integral · ParqueTEC · impresso em ${esc(fmtLong.format(agora))}, ${hhmm(agora)}${opNome() ? " por " + esc(opNome()) : ""}</p></div></div>
+      <p class="lst-res"><b>${todos.length} cadastrados:</b> ${conta.disp} disponíveis · ${conta.uso} em uso · ${conta.manut} em manutenção · ${conta.baixa} baixados${filtro !== "todos" ? ` · <b>nesta lista: ${linhas.length}</b>` : ""}</p>
+      <table class="lst"><thead><tr><th class="ok">✓</th><th>Código</th><th>Nº no lote</th><th>Patrimônio</th><th>Local</th><th>Situação</th><th>Detalhe</th></tr></thead><tbody>
+      ${[...grupos].map(([g, xs]) => `<tr class="g"><td colspan="7">${esc(g)} (${xs.length})</td></tr>` + xs.map(x => `<tr><td class="ok"></td><td><b>${x.c}</b></td><td>${esc(x.i.lote || "")}</td><td>${esc(x.i.patrimonio || "")}</td><td>${esc(x.i.local || "")}</td><td class="st">${x.s.t}</td><td>${esc(x.s.d)}</td></tr>`).join("")).join("")}
+      </tbody></table>
+      <div class="lst-ass"><span>Conferido por</span><span>Data</span><span>Assinatura</span></div>`;
+    try { await el.querySelector("img").decode(); } catch {}
     window.print();
   },
   async "pr-ok"(t) {
