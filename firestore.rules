@@ -2,30 +2,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /escolas/{escola} {
+      function logado() { return request.auth != null && request.auth.token.email != null; }
+      function email() { return request.auth.token.email.lower(); }
       // E-mail da coordenação (o mesmo do campo "dono" no config.js).
       function dono() {
-        return request.auth != null
-          && request.auth.token.email.lower() == "gomescomendadoroliveira@gmail.com"
+        return logado() && email() == "gomescomendadoroliveira@gmail.com"
           && request.auth.token.email_verified == true;
       }
-      function acesso() {
-        return request.auth != null
-          && exists(/databases/$(database)/documents/escolas/$(escola)/acessos/$(request.auth.token.email.lower()));
-      }
-      function coordenacao() {
-        return dono() || (acesso()
-          && get(/databases/$(database)/documents/escolas/$(escola)/acessos/$(request.auth.token.email.lower())).data.papel == "admin");
-      }
+      function acesso() { return logado() && exists(/databases/$(database)/documents/escolas/$(escola)/acessos/$(email())); }
+      function papel() { return get(/databases/$(database)/documents/escolas/$(escola)/acessos/$(email())).data.papel; }
       function liberado() { return dono() || acesso(); }
+      // Coordenação: tudo. Equipe (coordenação e operadores): retiradas, devoluções e pessoas.
+      function coordenacao() { return dono() || (acesso() && papel() == "admin"); }
+      function equipe() { return dono() || (acesso() && papel() in ["admin", "operador"]); }
 
-      // Só a coordenação muda acessos, configurações e equipamentos parados.
-      match /acessos/{email} { allow read: if liberado(); allow write: if coordenacao(); }
-      match /config/{doc}    { allow read: if liberado(); allow write: if coordenacao(); }
-      match /parados/{doc}   { allow read: if liberado(); allow write: if coordenacao(); }
+      match /acessos/{e}  { allow read: if liberado(); allow write: if coordenacao(); }
+      match /config/{d}   { allow read: if liberado(); allow write: if coordenacao(); }
+      match /parados/{d}  { allow read: if liberado(); allow write: if coordenacao(); }
 
-      // Retiradas, agenda, recados e pessoas: qualquer pessoa liberada.
+      // Pedidos de acesso: cada pessoa cria e vê o próprio; a coordenação aprova ou recusa.
+      match /pedidos/{e} {
+        allow read: if coordenacao() || (logado() && email() == e);
+        allow create, update: if coordenacao() || (logado() && email() == e && request.resource.data.status == "pendente");
+        allow delete: if coordenacao();
+      }
+
+      // Agenda: a equipe mexe em todos; o professor cria e cancela só os dele.
+      match /reservas/{d} {
+        allow read: if liberado();
+        allow create: if equipe() || (liberado() && request.resource.data.criadoPorEmail == email());
+        allow update, delete: if equipe() || (liberado() && resource.data.criadoPorEmail == email());
+      }
+
+      match /recados/{d} { allow read, write: if liberado(); }
+
+      // O professor só pode marcar "devolvi" na retirada dele; quem confere é a equipe.
+      match /emprestimos/{d} {
+        allow update: if liberado() && resource.data.responsavelEmail == email()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["aDevolver"]);
+      }
+
+      // Retiradas, devoluções e pessoas: todos leem, só a equipe grava.
       match /{colecao}/{doc} {
-        allow read, write: if liberado() && !(colecao in ["acessos", "config", "parados"]);
+        allow read: if liberado() && !(colecao in ["acessos", "config", "parados", "pedidos"]);
+        allow write: if equipe() && !(colecao in ["acessos", "config", "parados", "pedidos", "reservas", "recados"]);
       }
     }
   }

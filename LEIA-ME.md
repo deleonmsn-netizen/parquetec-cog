@@ -25,10 +25,23 @@ Depois da configuração inicial, ninguém precisa abrir o Firebase:
 | Tirar o acesso de alguém | App → Gerenciar → Acessos ao app → remover |
 | Esqueci a senha / mudar a senha | Tela de entrada → Esqueci a senha, ou Gerenciar → Mudar senha |
 
-Os perfis de acesso são dois:
+Os perfis de acesso são três:
 
-- **Operador**: retira, devolve, agenda, escreve recados e cadastra pessoas.
+- **Professor**: vê o Painel e a Agenda, agenda para si mesmo (com quantos de cada modelo), escreve recados e marca "Devolvi" nos equipamentos que levou.
+- **Operador**: libera retiradas, confere devoluções, agenda para qualquer pessoa e cadastra pessoas.
 - **Coordenação**: tudo isso e também equipamentos, configurações e acessos.
+
+### Como o professor entra
+
+1. Na tela de entrada, ele toca em **Criar minha conta** e coloca nome, e-mail e senha.
+2. A coordenação recebe o pedido em **Gerenciar → Acessos** (com aviso no app e por e-mail) e toca em **Aprovar**.
+3. O app do professor abre sozinho.
+
+### Agendamento, retirada e devolução
+
+1. O professor agenda: dia, aula e quantos de cada modelo (ex.: 10 Multilaser + 5 Positivo). A coordenação recebe um aviso.
+2. No dia, a coordenação libera em **Painel → Agendados para hoje → Retirar**. Os códigos já vêm separados.
+3. Na devolução, o professor toca em **Devolvi** e marca os códigos. A coordenação recebe o aviso, confere em **Painel → Devoluções para conferir** e confirma. Só então eles voltam a contar como disponíveis.
 
 ## Colocar no ar (feito uma vez só)
 
@@ -64,6 +77,15 @@ Também serve qualquer outra hospedagem de site estático (Netlify, Firebase Hos
 3. Diga quantos notebooks e tablets a escola tem. Os códigos são criados sozinhos: `NB-001`, `NB-002`… e `TB-001`, `TB-002`…
 4. Em **Gerenciar → Acessos ao app**, dê acesso a quem vai usar: nome, e-mail, uma senha inicial e o perfil. Passe o e-mail e a senha para a pessoa.
 5. Em **Gerenciar → Cadastrar pessoa**, cadastre quem pega equipamento. Para cadastrar muitas, cole a lista (uma por linha, `Nome; cargo ou turma`).
+
+## Avisos para a coordenação
+
+- **No app**: números vermelhos nas abas (novos agendamentos, pedidos de acesso, devoluções para conferir) e avisos na tela. Para receber o aviso mesmo com o app minimizado, toque em **Gerenciar → Ajustes → Ativar avisos**.
+- **Por e-mail** (opcional, gratuito, usa o próprio Gmail da coordenação):
+  1. Logado no Gmail da coordenação, abra <https://script.google.com> e clique em **Novo projeto**.
+  2. Apague o que estiver lá, cole todo o conteúdo do arquivo `aviso-email.gs` e clique em **Salvar**.
+  3. Clique em **Implantar → Nova implantação**, na engrenagem escolha **App da Web**. Em "Executar como" deixe **Eu**, em "Quem pode acessar" escolha **Qualquer pessoa** e clique em **Implantar**. Autorize o acesso.
+  4. Copie o **URL do app da Web** e coloque no campo `avisoEmail` do `config.js` (ou mande para o Claude colocar).
 
 ## Instalar nos aparelhos
 

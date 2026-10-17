@@ -1,6 +1,6 @@
 // Guarda o app no aparelho para abrir rápido e funcionar com internet fraca.
 // Ao publicar uma versão nova, troque o número abaixo.
-const CACHE = "parquetec-v6";
+const CACHE = "parquetec-v8";
 const SHELL = ["./", "./index.html", "./config.js", "./inventario-cog.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/cog-bulb.png", "./icons/cog-logo.webp"];
 
 self.addEventListener("install", (e) => {
@@ -25,4 +25,10 @@ self.addEventListener("fetch", (e) => {
   if (/^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com|www\.gstatic\.com\/firebasejs\/)/.test(req.url)) {
     e.respondWith(caches.match(req).then((m) => m || fetch(req).then(put)));
   }
+});
+
+// Toque no aviso abre o app.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ws) => ws.length ? ws[0].focus() : self.clients.openWindow("./")));
 });

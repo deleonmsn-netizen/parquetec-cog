@@ -9,7 +9,8 @@ window.PARQUETEC_FIREBASE = {
   messagingSenderId: "534282262824",
   appId: "1:534282262824:web:d4c485e148f421aeb1d81d",
   escola: "principal",
-  dono: "gomescomendadoroliveira@gmail.com"   // e-mail da coordenação: é quem libera os acessos no app
+  dono: "gomescomendadoroliveira@gmail.com",  // e-mail da coordenação: é quem libera os acessos no app
+  avisoEmail: ""   // endereço do aviso por e-mail (Google Apps Script). Veja aviso-email.gs
 };
 
 /* Exemplo de como fica depois de preenchido:
