@@ -436,6 +436,8 @@ const ui = {
   tab: store.get("tab", "painel"), tipo: "NB", seg: store.get("seg", "medio"), date: dayKey(),
   histQ: "", histLimit: 300, gerTipo: "NB", gerQ: "", showInativos: false, armed: null, unlocked: false
 };
+// "Quem está usando" fica guardado por login, para aparelhos compartilhados.
+const opKey = () => "operador" + (AUTH ? ":" + meuEmail() : "");
 let operador = store.get("operador", null);
 const unsub = {};
 
@@ -475,9 +477,9 @@ function subscribeAll() {
   subscribeHist(); subscribeReservas(); subscribeResHoje();
   if (MODE !== "firebase") subscribeFuturas();
   if (MODE === "firebase") listen("meuPedido", DB.doc("pedidos/" + meuEmail()), s => {
-    const tinha = S.meuPedido; S.meuPedido = s.exists ? s.data() : null;
+    const tinha = S.pedidoNoServidor; S.pedidoNoServidor = s.exists; S.meuPedido = s.exists ? s.data() : S.meuPedido;
     // Pedido aprovado (apagado) enquanto a pessoa esperava: abre o app.
-    if (tinha && !S.meuPedido && ui.semAcesso) location.reload();
+    if (tinha && !s.exists && ui.semAcesso) location.reload();
   });
   if (MODE === "firebase") listen("acessos", DB.collection("acessos"), s => {
     S.acessos = docsOf(s);
@@ -488,7 +490,8 @@ function subscribeAll() {
       if (!primeira) for (const x of S.pedidos) if (!antes.has(x.id)) avisarAparelho("Pedido de acesso", `${x.nome} (${x.id}) quer entrar no app.`);
     });
     const a = meuAcesso();
-    if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: a.papel === "admin" ? "Coordenação" : "" }; store.set("operador", operador); }
+    if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: PAPEIS[a.papel] || "" }; store.set(opKey(), operador); }
+    else if (!operador && souDono()) { operador = { id: "login:" + meuEmail(), nome: "Coordenação", cargo: "" }; store.set(opKey(), operador); }
   });
 }
 function subscribeHist() { listen("hist", DB.collection("emprestimos").orderBy("retiradoEm", "desc").limit(ui.histLimit), s => { S.hist = docsOf(s); }); }
@@ -653,7 +656,7 @@ function setupCard() {
 function vLogin() {
   return `<section class="card stack login">
     <div class="plate"><img src="icons/cog-logo.webp" alt="COG Ensino Integral" width="200" height="155"></div>
-    <div><h2 style="font-size:20px">Entrar no ParqueTEC</h2><p class="note" style="margin:6px 0 0">Use o e-mail e a senha que a coordenação cadastrou. Você só precisa entrar uma vez em cada aparelho.</p></div>
+    <div><h2 style="font-size:20px">Entrar no ParqueTEC</h2><p class="note" style="margin:6px 0 0">Entre com seu e-mail e senha. Você só precisa entrar uma vez em cada aparelho. Ainda não tem conta? Toque em “Criar minha conta”.</p></div>
     <label class="f">E-mail<input class="inp" id="lg-email" type="email" autocomplete="username" inputmode="email" value="${esc(store.get("email", ""))}"></label>
     <label class="f">Senha<input class="inp" id="lg-senha" type="password" autocomplete="current-password"></label>
     <button class="btn block" data-act="login">Entrar</button>
@@ -774,7 +777,7 @@ function vPainel() {
 function vAgenda() {
   if (!S.config) return setupCard();
   const [rel, base] = dayLabel(ui.date);
-  const st = stats(ui.tipo), noParque = st.parque - st.manut;
+  const passado = ui.date < dayKey();
   const aulas = cfg().horarios[ui.seg] || [];
   const slots = aulas.map((a, i) => {
     const res = S.reservas.filter(r => r.tipo === ui.tipo && r.seg === ui.seg && r.aula === i);
@@ -782,7 +785,7 @@ function vAgenda() {
     return `<div class="slot">
       <div><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.ini)} às ${esc(a.fim)}</div></div>
       <div class="free ${livres ? "" : "zero"}"><b>${livres}</b><small>livres</small></div>
-      <button class="btn go sm" data-act="agendar" data-i="${i}" ${livres ? "" : "disabled"}>Agendar</button>
+      <button class="btn go sm" data-act="agendar" data-i="${i}" ${livres && !passado ? "" : "disabled"} ${passado ? 'title="Esse dia já passou"' : ""}>Agendar</button>
       ${res.length ? `<div class="res">${res.map(r => `<div class="res-i"><div class="grow"><b>${esc(r.pessoaNome)}</b> · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}${r.turma ? " · " + esc(r.turma) : ""}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
         ${ui.date === dayKey() && isEquipe() ? `<button class="mini" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : ""}
         ${isEquipe() || r.criadoPorEmail === meuEmail() ? `<button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : "Cancelar"}</button>` : ""}</div>`).join("")}</div>` : ""}
@@ -797,6 +800,7 @@ function vAgenda() {
     </div>
     ${tipoSeg("", ui.tipo, "tipo")}
     <div class="seg small soft" role="group" aria-label="Segmento">${Object.entries(SEGS).map(([k, l]) => `<button data-act="seg" data-v="${k}" aria-pressed="${ui.seg === k}">${l}</button>`).join("")}</div>
+    ${passado ? `<div class="note" style="text-align:center">Esse dia já passou: dá para ver os agendamentos, mas não criar novos.</div>` : ""}
     <section class="card">${slots || `<div class="empty">Nenhum horário cadastrado para ${SEGS[ui.seg]}. Adicione em Gerenciar.</div>`}</section>`;
 }
 
@@ -805,7 +809,7 @@ function vRecados() {
   const item = (r) => `<article class="msg ${r.fixado ? "pin" : ""}">
       <div class="meta"><b style="color:var(--ink)">${esc(r.autor || "Sem nome")}</b><span class="grow">${esc(dayLabel(dayKey(new Date(r.em)))[0] || fmtLong.format(new Date(r.em)))} às ${hhmm(r.em)}</span>${r.fixado ? '<span class="badge">fixado</span>' : ""}</div>
       <p>${esc(r.texto)}</p>
-      <div class="meta"><span class="grow"></span><button class="mini" data-act="fixar" data-id="${r.id}">${r.fixado ? "Desafixar" : "Fixar"}</button><button class="mini ${ui.armed === "rec:" + r.id ? "warn" : ""}" data-act="apagar-rec" data-id="${r.id}">${ui.armed === "rec:" + r.id ? "Confirmar" : "Apagar"}</button></div>
+      <div class="meta"><span class="grow"></span>${isEquipe() ? `<button class="mini" data-act="fixar" data-id="${r.id}">${r.fixado ? "Desafixar" : "Fixar"}</button>` : ""}${isEquipe() || (r.autorEmail && r.autorEmail === meuEmail()) ? `<button class="mini ${ui.armed === "rec:" + r.id ? "warn" : ""}" data-act="apagar-rec" data-id="${r.id}">${ui.armed === "rec:" + r.id ? "Confirmar" : "Apagar"}</button>` : ""}</div>
     </article>`;
   return `<section class="card stack">
       <label class="f">Novo recado para a equipe<textarea class="inp" id="recado-txt" placeholder="Ex.: Carregador do NB-014 ficou na sala 7. Os tablets do carrinho 2 estão sem carga."></textarea></label>
@@ -841,7 +845,7 @@ function vHistorico() {
 }
 
 function vGerenciar() {
-  if (cfg().pinHash && !ui.unlocked) {
+  if (cfg().pinHash && !ui.unlocked && isEquipe()) {
     return `<section class="card stack"><h2 style="font-size:18px">Área protegida</h2><p class="note" style="margin:0">Digite o PIN de administração para mexer em equipamentos, pessoas e configurações.</p>
       <input class="inp" id="pin-in" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN">
       <button class="btn block" data-act="desbloquear">Entrar</button></section>`;
@@ -1009,13 +1013,19 @@ function vInventario() {
   </section>`;
 }
 
+const idPapel = (email) => "pd-papel-" + email.replace(/[^a-z0-9]/gi, "_");
+// Liga o login a uma pessoa cadastrada (cria se ainda não existir).
+async function pessoaDoLogin(nome, papel) {
+  const ps = S.pessoas.find(p => p.ativo !== false && norm(p.nome) === norm(nome));
+  return ps || await novaPessoa(nome, { tipo: "Profissional", cargo: papel === "professor" ? "Professor(a)" : PAPEIS[papel] });
+}
 function vAcessos() {
   const lista = S.acessos.slice().sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1);
   return `<section class="card stack">
     <div><h2 style="font-size:17px">Acessos ao app</h2><p class="note" style="margin:4px 0 0">Quem pode entrar no app. <b>Professor</b> agenda para si e acompanha. <b>Operador</b> também libera retiradas e devoluções e cadastra pessoas. <b>Coordenação</b> mexe em tudo, inclusive equipamentos, configurações e acessos.</p></div>
     ${S.pedidos.length ? `<div class="imp" style="border-color:var(--accent)"><b>Pedidos de acesso (${S.pedidos.length})</b>
       ${S.pedidos.map((x, i) => `<div class="row" style="flex-wrap:wrap"><div class="grow"><div class="t">${esc(x.nome)}</div><div class="s">${esc(x.id)} · pediu ${esc(dayLabel(dayKey(new Date(x.em || Date.now())))[0] || fmtLong.format(new Date(x.em || Date.now())))}</div></div>
-        <select class="inp" id="pd-papel-${i}" style="width:auto" aria-label="Perfil de ${esc(x.nome)}"><option value="professor">Professor</option><option value="operador">Operador</option><option value="admin">Coordenação</option></select>
+        <select class="inp" id="${idPapel(x.id)}" style="width:auto" aria-label="Perfil de ${esc(x.nome)}"><option value="professor">Professor</option><option value="operador">Operador</option><option value="admin">Coordenação</option></select>
         <button class="btn go sm" data-act="aprovar" data-id="${esc(x.id)}" data-i="${i}">Aprovar</button><button class="mini" data-act="recusar" data-id="${esc(x.id)}">Recusar</button></div>`).join("")}</div>` : ""}
     <div class="list">
       ${CONF.dono ? `<div class="row"><div class="grow"><div class="t">${esc(CONF.dono)}</div><div class="s">Coordenação · conta principal</div></div></div>` : ""}
@@ -1307,6 +1317,7 @@ const acts = {
     const st = modal.state, ms = modelosDe(ui.tipo), L = livresSlot(ui.tipo, ui.seg, st.aula), livres = L.total;
     let itens = null, qtd = parseInt(st.qtd) || 0;
     if (!st.pessoa) return toast("Escolha para quem é o agendamento.");
+    if (ui.date < dayKey()) return toast("Esse dia já passou. Escolha hoje ou um dia à frente.");
     if (ms.length) {
       itens = {};
       for (const m of ms) { const n = parseInt(st.qtds[m]) || 0; if (n > L.porModelo[m]) return toast(`Só há ${L.porModelo[m]} ${m} livres nessa aula.`); if (n > 0) itens[m] = n; }
@@ -1325,10 +1336,10 @@ const acts = {
   "retirar-res"(t) { const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return; openRetirar({ tipo: r.tipo, pessoa: pessoa(r.pessoaId) || { id: r.pessoaId, nome: r.pessoaNome }, fin: "Agendamento", turma: r.turma, qtd: r.qtd, itens: r.itens, resId: r.id }); },
 
   /* operador */
-  "op-ok"() { const p = modal.state.pessoa; if (!p) return; operador = { id: p.id, nome: p.nome, cargo: p.cargo || "" }; store.set("operador", operador); modal.close(); render(); toast(`Olá, ${p.nome.split(" ")[0]}!`); },
+  "op-ok"() { const p = modal.state.pessoa; if (!p) return; operador = { id: p.id, nome: p.nome, cargo: p.cargo || "" }; store.set(opKey(), operador); modal.close(); render(); toast(`Olá, ${p.nome.split(" ")[0]}!`); },
 
   /* recados */
-  async "enviar-rec"(t) { const el = $("#recado-txt"), txt = el.value.trim(); if (!txt) return toast("Escreva o recado primeiro."); t.disabled = true; if (await write(() => DB.collection("recados").doc().set({ texto: txt.slice(0, 2000), autor: opNome(), autorId: operador ? operador.id : "", em: Date.now(), fixado: false }), "Recado publicado")) { el.value = ""; store.set("recadosVistos", Date.now()); } t.disabled = false; },
+  async "enviar-rec"(t) { const el = $("#recado-txt"), txt = el.value.trim(); if (!txt) return toast("Escreva o recado primeiro."); t.disabled = true; if (await write(() => DB.collection("recados").doc().set({ texto: txt.slice(0, 2000), autor: opNome() || (meuAcesso() || {}).nome || meuEmail(), autorId: operador ? operador.id : "", autorEmail: meuEmail(), em: Date.now(), fixado: false }), "Recado publicado")) { el.value = ""; store.set("recadosVistos", Date.now()); } t.disabled = false; },
   async fixar(t) { const r = S.recados.find(x => x.id === t.dataset.id); if (r) await write(() => DB.doc("recados/" + r.id).update({ fixado: !r.fixado })); },
   async "apagar-rec"(t) { const k = "rec:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("recados/" + t.dataset.id).delete(), "Recado apagado"); },
 
@@ -1451,9 +1462,8 @@ const acts = {
   async "pedir-acesso"() { const nome = $("#pd-nome").value.trim(); if (nome.length < 3) return toast("Digite seu nome completo."); await pedirAcesso(nome); },
   async aprovar(t) {
     const email = t.dataset.id, x = S.pedidos.find(p => p.id === email); if (!x) return;
-    const papel = ($("#pd-papel-" + t.dataset.i) || {}).value || "professor"; t.disabled = true;
-    let ps = S.pessoas.find(p => p.ativo !== false && norm(p.nome) === norm(x.nome));
-    if (!ps) ps = await novaPessoa(x.nome, { tipo: "Profissional", cargo: papel === "professor" ? "Professor(a)" : PAPEIS[papel] });
+    const papel = (document.getElementById(idPapel(email)) || {}).value || "professor"; t.disabled = true;
+    const ps = await pessoaDoLogin(x.nome, papel);
     if (!ps) { t.disabled = false; return; }
     if (await write(() => DB.doc("acessos/" + email).set({ nome: x.nome, papel, pessoaId: ps.id, criadoEm: Date.now(), criadoPor: meuEmail() }))) {
       await write(() => DB.doc("pedidos/" + email).delete(), `${x.nome.split(" ")[0]} aprovado(a). O app já abre para ela(e).`);
@@ -1489,7 +1499,9 @@ const acts = {
     let novo;
     try { novo = await FB.criarConta(email, senha); }
     catch (e) { t.disabled = false; return toast(e && e.code === "auth/invalid-email" ? "Esse e-mail não é válido." : e && e.code === "auth/weak-password" ? "Senha fraca demais. Use pelo menos 6 caracteres." : "Não deu para criar o login. Confira a internet.", 5000); }
-    if (await write(() => DB.doc("acessos/" + email).set({ nome, papel, criadoEm: Date.now(), criadoPor: meuEmail() }),
+    const ps = await pessoaDoLogin(nome, papel);
+    if (!ps) { t.disabled = false; return; }
+    if (await write(() => DB.doc("acessos/" + email).set({ nome, papel, pessoaId: ps.id, criadoEm: Date.now(), criadoPor: meuEmail() }),
       novo ? `Acesso criado para ${nome.split(" ")[0]}. Passe o e-mail e a senha para a pessoa.` : `${nome.split(" ")[0]} já tinha login: ela entra com a senha que já usa, ou toca em “Esqueci a senha”.`)) {
       ["#ac-nome", "#ac-email", "#ac-senha"].forEach(id => { const el = $(id); if (el) el.value = ""; });
     }
@@ -1535,7 +1547,7 @@ document.addEventListener("input", (ev) => {
   let mm;
   if (st && (mm = id.match(/^(rt|ag)-n-(\d+)$/))) { st.qtds[modelosDe(mm[1] === "rt" ? st.tipo : ui.tipo)[Number(mm[2])]] = t.value; if (mm[1] === "ag") modal.draw(); return; }
   if (id === "dv-q" && st) { st.q = t.value; return modal.draw(); }
-  if (st) { const map = { "rt-turma": "turma", "rt-obs": "obs", "rt-qtd": "qtd", "ag-qtd": "qtd", "ag-turma": "turma", "ag-obs": "obs", "pr-motivo": "motivo" }; if (map[id]) st[map[id]] = t.value; }
+  if (st) { const map = { "rt-turma": "turma", "rt-obs": "obs", "rt-qtd": "qtd", "ag-qtd": "qtd", "ag-turma": "turma", "ag-obs": "obs", "pr-motivo": "motivo", "pr-modelo": "modelo", "pr-pat": "patrimonio", "pr-local": "local" }; if (map[id]) st[map[id]] = t.value; }
   if (id === "hist-q") { ui.histQ = t.value; render(); }
   if (id === "ger-q") { ui.gerQ = t.value; render(); }
 });
@@ -1560,7 +1572,7 @@ function toast(msg, ms = 2800) {
 }
 
 /* ---------- Início ---------- */
-function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null, futurasOk: false, pedidosOk: false, abertosOk: false }); ui.semAcesso = false; ui.importPrev = null; }
+function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null, pedidoNoServidor: false, futurasOk: false, pedidosOk: false, abertosOk: false }); ui.semAcesso = false; ui.importPrev = null; }
 async function boot() {
   const conf = HOSTED && window.PARQUETEC_FIREBASE;
   if (HOSTED) {
@@ -1576,9 +1588,10 @@ async function boot() {
     DB = FB.db; MODE = "firebase";
     FB.onAuth(u => {
       ui.authReady = true;
-      if (!u) { AUTH = null; ui.verificar = false; stopAll(); return render(); }
+      if (!u) { AUTH = null; operador = null; ui.verificar = false; stopAll(); return render(); }
       const trocou = !AUTH || AUTH.uid !== u.uid;
       AUTH = u;
+      if (trocou) operador = store.get(opKey(), null);
       // A coordenação (dono) precisa confirmar o e-mail antes de entrar: é isso que as regras do Firebase exigem.
       if (souDono() && !u.emailVerified) { ui.verificar = true; stopAll(); return render(); }
       ui.verificar = false;
@@ -1594,7 +1607,7 @@ async function boot() {
     if (cloud) { DB = cloud; MODE = "claude"; } else { DB = localDB(); MODE = "local"; }
     subscribeAll();
   }
-  setInterval(() => { const k = dayKey(); if (k !== boot.day) { if (Object.keys(unsub).length) { if (ui.date === boot.day) { ui.date = k; subscribeReservas(); } subscribeResHoje(); } boot.day = k; render(); } }, 60000);
+  setInterval(() => { const k = dayKey(); if (k !== boot.day) { if (Object.keys(unsub).length) { if (ui.date === boot.day) { ui.date = k; subscribeReservas(); } subscribeResHoje(); if (unsub.futuras) subscribeFuturas(); } boot.day = k; render(); } }, 60000);
   boot.day = dayKey();
 }
 render();

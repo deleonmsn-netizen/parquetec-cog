@@ -34,7 +34,12 @@ service cloud.firestore {
         allow update, delete: if equipe() || (liberado() && resource.data.criadoPorEmail == email());
       }
 
-      match /recados/{d} { allow read, write: if liberado(); }
+      // Recados: todos escrevem; apaga quem escreveu ou a equipe.
+      match /recados/{d} {
+        allow read: if liberado();
+        allow create: if liberado() && request.resource.data.autorEmail == email();
+        allow update, delete: if equipe() || (liberado() && resource.data.autorEmail == email());
+      }
 
       // O professor só pode marcar "devolvi" na retirada dele; quem confere é a equipe.
       match /emprestimos/{d} {
