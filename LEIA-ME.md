@@ -13,7 +13,7 @@ igual a um aplicativo. Não tem nada para baixar de loja.
 - **Recados**: mural para a equipe, com recados fixados.
 - **Histórico**: busca por equipamento, pessoa ou turma, e baixa uma planilha que abre no Excel.
 - **Gerenciar**: pessoas (uma a uma ou colando uma lista), acessos ao app, manutenção e baixa de equipamentos, quantidade de equipamentos, horários das aulas e WhatsApp da escola.
-- **Impressão** (Gerenciar → Equipamentos → Inventário): lista de equipamentos com logo, data, modelo, patrimônio, local e situação (todos, ou só disponíveis, em uso, em manutenção ou baixados), com coluna para conferência e campo de assinatura; e etiquetas com o logo para colar nos aparelhos. Na janela de impressão dá para escolher “Salvar como PDF”.
+- **Impressão** (botão **Imprimir** no Painel, ou Gerenciar → Equipamentos → Inventário): lista de equipamentos com logo, data, modelo, patrimônio, local e situação (todos, ou só disponíveis, em uso, em manutenção ou baixados), com coluna para conferência e campo de assinatura; e etiquetas com o logo para colar nos aparelhos. Na janela de impressão dá para escolher “Salvar como PDF”.
 
 ## Tudo se faz pelo app
 
@@ -41,7 +41,7 @@ Os perfis de acesso são três:
 ### Agendamento, retirada e devolução
 
 1. O professor agenda: dia, aula e quantos de cada modelo (ex.: 10 Multilaser + 5 Positivo). A coordenação recebe um aviso.
-2. No dia, a coordenação libera em **Painel → Agendados para hoje → Retirar**. Os códigos já vêm separados.
+2. No dia, a coordenação libera em **Painel → Agendados para hoje → Retirar**. Os códigos já vêm separados. Se não for liberar, toca em **Recusar**: os equipamentos voltam a ficar livres e o professor vê "recusado pela coordenação". Ao remover o acesso ou desativar uma pessoa, os agendamentos dela são recusados sozinhos.
 3. Na devolução, o professor toca em **Devolvi** e marca os códigos. A coordenação recebe o aviso, confere em **Painel → Devoluções para conferir** e confirma. Só então eles voltam a contar como disponíveis.
 
 ## Colocar no ar (feito uma vez só)

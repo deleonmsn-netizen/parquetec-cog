@@ -516,13 +516,19 @@ function subscribeFuturas() {
     const antes = new Set(S.futuras.map(r => r.id)), primeira = !S.futurasOk;
     S.futuras = docsOf(s); S.futurasOk = true;
     if (primeira) return;
-    for (const r of S.futuras) if (!antes.has(r.id) && r.criadoPorEmail && r.criadoPorEmail !== meuEmail()) {
+    for (const r of S.futuras) if (!antes.has(r.id) && ativa(r) && r.criadoPorEmail && r.criadoPorEmail !== meuEmail()) {
       const [rel, base] = dayLabel(r.data);
       avisarAparelho("Novo agendamento", `${r.pessoaNome}: ${resumoItens(r.itens, r.qtd, r.tipo)} · ${rel || base} · ${r.aulaNome || ""}`);
     }
   });
 }
-function subscribeResHoje() { listen("resHoje", DB.collection("reservas").where("data", "==", dayKey()), s => { S.resHoje = docsOf(s); }); }
+function subscribeResHoje() {
+  listen("resHoje", DB.collection("reservas").where("data", "==", dayKey()), s => {
+    const antes = new Map(S.resHoje.map(r => [r.id, r.status])), primeira = !S.resHojeOk;
+    S.resHoje = docsOf(s); S.resHojeOk = true;
+    if (!primeira) for (const r of S.resHoje) if (r.status === "recusado" && antes.has(r.id) && antes.get(r.id) !== "recusado" && r.criadoPorEmail === meuEmail()) avisarAparelho("Agendamento recusado", `A coordenação recusou seu agendamento de hoje (${resumoItens(r.itens, r.qtd, r.tipo)}).`);
+  });
+}
 function subscribeReservas() { listen("reservas", DB.collection("reservas").where("data", "==", ui.date), s => { S.reservas = docsOf(s); }); }
 
 function errMsg(e) {
@@ -570,6 +576,19 @@ function codeGrid(codes, btn) {
   if (g.size === 1 && g.has("")) return `<div class="codes">${codes.map(btn).join("")}</div>`;
   return [...g].map(([m, l]) => `<div class="grp"><span>${esc(m || "Sem modelo")}</span><span>${l.length}</span></div><div class="codes">${l.map(btn).join("")}</div>`).join("");
 }
+const ativa = (r) => r.status !== "recusado";
+// Avisa quando o agendamento é de alguém que saiu (login removido ou pessoa desativada).
+function alertaRes(r) {
+  const ps = pessoa(r.pessoaId);
+  if (ps && ps.ativo === false) return "pessoa desativada";
+  if (MODE === "firebase" && r.criadoPorEmail && r.criadoPorEmail !== String(CONF.dono || "").toLowerCase() && S.acessos.length && !S.acessos.some(a => a.id === r.criadoPorEmail)) return "login removido";
+  return "";
+}
+async function recusarReservas(lista, motivo) {
+  let n = 0;
+  for (const r of lista) if (ativa(r) && await write(() => DB.doc("reservas/" + r.id).update({ status: "recusado", motivo, recusadoEm: Date.now(), recusadoPor: opNome() || meuEmail() }))) n++;
+  return n;
+}
 const somaQ = (o) => Object.values(o || {}).reduce((a, n) => a + (parseInt(n) || 0), 0);
 function resumoItens(itens, total, tipo) {
   const e = Object.entries(itens || {}).filter(([, n]) => Number(n) > 0);
@@ -585,7 +604,7 @@ function resumoCodes(codes, tipo) {
 // Quantos ainda dá para agendar numa aula: no total e de cada modelo.
 function livresSlot(t, seg, idx) {
   const st = stats(t), par = paradosMap();
-  const res = S.reservas.filter(r => r.tipo === t && r.seg === seg && r.aula === idx);
+  const res = S.reservas.filter(r => r.tipo === t && r.seg === seg && r.aula === idx && ativa(r));
   const total = Math.max(0, st.parque - st.manut - res.reduce((a, r) => a + (Number(r.qtd) || 0), 0));
   const porModelo = {};
   for (const m of modelosDe(t)) {
@@ -733,12 +752,13 @@ function installCard() {
 
 function agendadosHoje(t) {
   const ordem = (r) => (r.seg === "medio" ? 0 : 100) + (Number(r.aula) || 0);
-  const lista = S.resHoje.filter(r => r.tipo === t).sort((a, b) => ordem(a) - ordem(b));
+  const lista = S.resHoje.filter(r => r.tipo === t && (ativa(r) || r.criadoPorEmail === meuEmail())).sort((a, b) => ordem(a) - ordem(b));
   if (!lista.length) return "";
   const feito = (r) => S.abertos.some(e => e.reservaId === r.id) || S.hist.some(e => e.reservaId === r.id);
   const rows = lista.map(r => { const a = (cfg().horarios[r.seg] || [])[r.aula] || {};
-    return `<div class="row"><div class="grow"><div class="t">${esc(r.pessoaNome)}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}</div></div>
-      ${feito(r) ? `<span class="badge">retirado</span>` : isEquipe() ? `<button class="btn go sm" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : `<span class="badge">aguardando liberação</span>`}</div>`; }).join("");
+    const al = isEquipe() && ativa(r) ? alertaRes(r) : "";
+    return `<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:180px"><div class="t">${esc(r.pessoaNome)}${al ? ` <span class="badge late">${al}</span>` : ""}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) && r.motivo && r.motivo !== "recusado pela coordenação" ? ` · ${esc(r.motivo)}` : ""}</div></div>
+      ${!ativa(r) ? `<span class="badge late">recusado pela coordenação</span>` : feito(r) ? `<span class="badge">retirado</span>` : isEquipe() ? `<div style="display:flex;gap:6px"><button class="mini ${ui.armed === "nega:" + r.id ? "warn" : ""}" data-act="recusar-res" data-id="${r.id}">${ui.armed === "nega:" + r.id ? "Confirmar" : "Recusar"}</button><button class="btn go sm" data-act="retirar-res" data-id="${r.id}">Retirar</button></div>` : `<span class="badge">aguardando liberação</span>`}</div>`; }).join("");
   return `<section class="card"><div class="sec-h"><h2>Agendados para hoje</h2><span class="note">${lista.length}</span></div>
     <p class="note" style="margin:0 0 4px">${isEquipe() ? `Agendar só reserva. Os ${TIPOS[t].nome.toLowerCase()} passam para “Em uso” quando você toca em Retirar e entrega.` : `Na hora da aula, a coordenação libera a retirada.`}</p><div class="list">${rows}</div></section>`;
 }
@@ -784,7 +804,8 @@ function vPainel() {
       <div class="tile t-stop"><span class="lbl">Parados</span><span class="num">${st.parados}</span></div>
       <div class="tile t-park"><span class="lbl">Total no parque</span><span class="num">${st.parque}</span></div>
     </div>
-    <div class="note">Em manutenção: ${st.manut} · Baixados: ${st.baixa} (fora do parque) · Cadastrados: ${st.total}</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="note" style="flex:1;min-width:200px">Em manutenção: ${st.manut} · Baixados: ${st.baixa} (fora do parque) · Cadastrados: ${st.total}</div>
+      ${HOSTED && isEquipe() ? `<button class="btn ghost sm" data-act="imprimir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7"/></svg>Imprimir</button>` : ""}</div>
     ${agendadosHoje(ui.tipo)}
     ${porModelo(ui.tipo)}
     <section class="card"><div class="sec-h"><h2>Em uso agora</h2>${abertos.length ? `<span class="note">${abertos.length} ${abertos.length === 1 ? "retirada" : "retiradas"}</span>` : ""}</div>${lista}</section>`;
@@ -802,9 +823,10 @@ function vAgenda() {
       <div><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.ini)} às ${esc(a.fim)}</div></div>
       <div class="free ${livres ? "" : "zero"}"><b>${livres}</b><small>livres</small></div>
       <button class="btn go sm" data-act="agendar" data-i="${i}" ${livres && !passado ? "" : "disabled"} ${passado ? 'title="Esse dia já passou"' : ""}>Agendar</button>
-      ${res.length ? `<div class="res">${res.map(r => `<div class="res-i"><div class="grow"><b>${esc(r.pessoaNome)}</b> · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}${r.turma ? " · " + esc(r.turma) : ""}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
-        ${ui.date === dayKey() && isEquipe() ? `<button class="mini" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : ""}
-        ${isEquipe() || r.criadoPorEmail === meuEmail() ? `<button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : "Cancelar"}</button>` : ""}</div>`).join("")}</div>` : ""}
+      ${res.length ? `<div class="res">${res.map(r => { const al = isEquipe() && ativa(r) ? alertaRes(r) : ""; return `<div class="res-i" style="${ativa(r) ? "" : "opacity:.6"}"><div class="grow"><b>${esc(r.pessoaNome)}</b>${al ? ` <span class="badge late">${al}</span>` : ""} · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) ? ` · <b style="color:var(--danger)">recusado</b>${r.motivo && r.motivo !== "recusado pela coordenação" ? " (" + esc(r.motivo) + ")" : ""}` : ""}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
+        ${ui.date === dayKey() && isEquipe() && ativa(r) ? `<button class="mini" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : ""}
+        ${isEquipe() && ativa(r) && !passado ? `<button class="mini ${ui.armed === "nega:" + r.id ? "warn" : ""}" data-act="recusar-res" data-id="${r.id}">${ui.armed === "nega:" + r.id ? "Confirmar" : "Recusar"}</button>` : ""}
+        ${isEquipe() || r.criadoPorEmail === meuEmail() ? `<button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : ativa(r) ? "Cancelar" : "Apagar"}</button>` : ""}</div>`; }).join("")}</div>` : ""}
     </div>`;
   }).join("");
   return `<div class="card datebar">
@@ -1224,6 +1246,17 @@ function mAgendar(st) {
     <button class="btn go block" data-act="ag-ok">Confirmar agendamento</button>`;
 }
 
+function mImprimir() {
+  return `${head("Imprimir")}
+    <div class="stack" style="gap:10px"><b>Lista de equipamentos</b>
+      <p class="note" style="margin:0">Logo, data e cada equipamento com modelo, patrimônio, local e situação. Para gerar PDF, escolha “Salvar como PDF” na janela de impressão.</p>
+      <label class="f">O que imprimir<select class="inp" id="lista-filtro">
+        <option value="todos">Todos os equipamentos</option><option value="disp">Só os disponíveis</option><option value="uso">Só os em uso</option><option value="manut">Só os em manutenção</option><option value="baixa">Só os baixados (inativos)</option><option value="parados">Manutenção e baixados</option></select></label>
+      <button class="btn block" data-act="lista-imprimir">Imprimir lista</button></div>
+    ${isAdmin() ? `<div class="stack" style="gap:10px;border-top:1px solid var(--line);padding-top:14px"><b>Etiquetas com o logo</b>
+      <p class="note" style="margin:0">Uma etiqueta por equipamento (código, modelo e patrimônio), três por linha, para recortar e colar.</p>
+      <button class="btn ghost block" data-act="etiquetas">Imprimir etiquetas</button></div>` : ""}`;
+}
 function openOperador() { modal.open(mOperador, { live: true, pessoa: null, q: "" }); }
 function mOperador(st) {
   return `${head("Quem está usando o app?")}
@@ -1286,6 +1319,7 @@ const acts = {
   seg(t) { ui.seg = t.dataset.v; store.set("seg", ui.seg); render(); },
   dia(t) { const d = keyToDate(ui.date); d.setDate(d.getDate() + Number(t.dataset.v)); ui.date = dayKey(d); subscribeReservas(); render(); },
   operador() { openOperador(); },
+  imprimir() { modal.open(mImprimir, {}); },
   retirar() { if (!S.config) return toast("Primeiro diga quantos equipamentos a escola tem."); if (!operador) toast("Dica: toque em Trocar, no topo, para registrar quem está autorizando."); openRetirar(); },
   devolver(t) { openDevolver(t.dataset.id); },
   fechar() { modal.close(); },
@@ -1353,6 +1387,11 @@ const acts = {
       modal.close();
       if (!isAdmin()) { const a = cfg().horarios[r.seg][r.aula] || {}; avisarEmail({ tipo: "agendamento", pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || ""} (${a.ini || ""} às ${a.fim || ""}) · ${SEGS[r.seg]}`, itens: resumoItens(r.itens, r.qtd, r.tipo), turma: r.turma, obs: r.obs, por: r.criadoPor }); }
     } else t.disabled = false;
+  },
+  async "recusar-res"(t) {
+    const k = "nega:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null;
+    const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return;
+    if (await recusarReservas([r], "recusado pela coordenação")) toast(`Agendamento de ${r.pessoaNome.split(" ")[0]} recusado. Os equipamentos voltam a ficar livres.`, 5000);
   },
   async "cancelar-res"(t) { const k = "res:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("reservas/" + t.dataset.id).delete(), "Agendamento cancelado"); },
   "retirar-res"(t) { const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return; openRetirar({ tipo: r.tipo, pessoa: pessoa(r.pessoaId) || { id: r.pessoaId, nome: r.pessoaNome }, fin: "Agendamento", turma: r.turma, qtd: r.qtd, itens: r.itens, resId: r.id }); },
@@ -1423,7 +1462,7 @@ const acts = {
     let el = $("#print"); if (!el) { el = document.createElement("div"); el.id = "print"; document.body.appendChild(el); }
     el.innerHTML = `<div class="etqs">` + codes.map(c => { const i = inv(c); return `<div class="etq"><img src="icons/cog-bulb.png" alt=""><div><b>${c}</b><span>${esc(i.modelo || "")}</span><span>${i.patrimonio ? "Patrimônio " + esc(i.patrimonio) : ""}</span><small>COG · Ensino Integral</small></div></div>`; }).join("") + `</div>`;
     try { await Promise.all([...el.querySelectorAll("img")].slice(0, 1).map(img => img.decode())); } catch {}
-    window.print();
+    modal.close(); window.print();
   },
   async "lista-imprimir"() {
     const filtro = ($("#lista-filtro") || {}).value || "todos", par = paradosMap(), uso = emUsoMap();
@@ -1450,7 +1489,7 @@ const acts = {
       </tbody></table>
       <div class="lst-ass"><span>Conferido por</span><span>Data</span><span>Assinatura</span></div>`;
     try { await el.querySelector("img").decode(); } catch {}
-    window.print();
+    modal.close(); window.print();
   },
   async "pr-ok"(t) {
     const st = modal.state, motivo = $("#pr-motivo").value.trim(); t.disabled = true;
@@ -1473,7 +1512,12 @@ const acts = {
   },
   "editar-p"(t) { ui.editP = t.dataset.id || null; render(); },
   async "salvar-p"(t) { const nome = $("#e-nome").value.trim(); if (nome.length < 3) return toast("Digite o nome completo."); if (await write(() => DB.doc("pessoas/" + t.dataset.id).update({ nome, cargo: $("#e-cargo").value.trim(), tipo: $("#e-tipo").value }), "Dados atualizados")) { ui.editP = null; render(); } },
-  async "desativar-p"(t) { const k = "p:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("pessoas/" + t.dataset.id).update({ ativo: false }), "Pessoa desativada. O histórico dela continua salvo."); },
+  async "desativar-p"(t) {
+    const id = t.dataset.id, k = "p:" + id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null;
+    if (!(await write(() => DB.doc("pessoas/" + id).update({ ativo: false })))) return;
+    const n = await recusarReservas(S.futuras.filter(r => r.pessoaId === id), "pessoa desativada");
+    toast(`Pessoa desativada.${n ? ` ${n} agendamento${n === 1 ? "" : "s"} dela foi recusado${n === 1 ? "" : "s"}.` : ""} O histórico continua salvo.`, 5000);
+  },
   async "reativar-p"(t) { await write(() => DB.doc("pessoas/" + t.dataset.id).update({ ativo: true }), "Pessoa reativada"); },
   "ver-inativos"() { ui.showInativos = !ui.showInativos; render(); },
   "h-add"(t) { const seg = t.dataset.seg; const c = readCfgForm(); const l = c.horarios[seg]; const last = l[l.length - 1]; l.push({ nome: `${l.length + 1}ª aula`, ini: last ? last.fim : "07:00", fim: "" }); S.config = c; ui.noKeep = true; render(); },
@@ -1560,7 +1604,12 @@ const acts = {
     }
     t.disabled = false;
   },
-  async "remover-acesso"(t) { const k = "ac:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("acessos/" + t.dataset.id).delete(), "Acesso removido. A pessoa não entra mais no app."); },
+  async "remover-acesso"(t) {
+    const email = t.dataset.id, k = "ac:" + email; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null;
+    if (!(await write(() => DB.doc("acessos/" + email).delete()))) return;
+    const n = await recusarReservas(S.futuras.filter(r => r.criadoPorEmail === email), "acesso removido");
+    toast(`Acesso removido. A pessoa não entra mais no app.${n ? ` ${n} agendamento${n === 1 ? "" : "s"} dela foi recusado${n === 1 ? "" : "s"}.` : ""}`, 5000);
+  },
   async instalar() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; render(); },
   "instalar-depois"() { store.set("installDispensado", true); render(); },
   async "copiar-url"() { const el = $("#app-url"); try { await navigator.clipboard.writeText(el.value); toast("Endereço copiado. Mande pelo WhatsApp para quem vai usar."); } catch { el.select(); toast("Selecione e copie o endereço."); } },
@@ -1589,7 +1638,7 @@ document.addEventListener("click", (ev) => {
   const a = t.dataset.act; if (!acts[a]) return;
   if (a === "ov" && ev.target !== t) return;
   if (a !== "wa") ev.preventDefault();
-  if (!/^(cancelar-res|apagar-rec|desativar-p|remover-acesso|recusar)$/.test(a) && ui.armed) { ui.armed = null; if (!t.closest("#modal")) render(); }
+  if (!/^(cancelar-res|recusar-res|apagar-rec|desativar-p|remover-acesso|recusar)$/.test(a) && ui.armed) { ui.armed = null; if (!t.closest("#modal")) render(); }
   acts[a](t, ev);
 });
 document.addEventListener("input", (ev) => {
@@ -1625,7 +1674,7 @@ function toast(msg, ms = 2800) {
 }
 
 /* ---------- Início ---------- */
-function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null, pedidoNoServidor: false, futurasOk: false, pedidosOk: false, abertosOk: false }); ui.semAcesso = false; ui.importPrev = null; }
+function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null, pedidoNoServidor: false, futurasOk: false, pedidosOk: false, abertosOk: false, resHojeOk: false }); ui.semAcesso = false; ui.importPrev = null; }
 async function boot() {
   const conf = HOSTED && window.PARQUETEC_FIREBASE;
   if (HOSTED) {

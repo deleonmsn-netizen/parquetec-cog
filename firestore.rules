@@ -27,11 +27,12 @@ service cloud.firestore {
         allow delete: if coordenacao();
       }
 
-      // Agenda: a equipe mexe em todos; o professor cria e cancela só os dele.
+      // Agenda: a equipe mexe em todos (inclusive recusa); o professor cria e cancela só os dele.
       match /reservas/{d} {
         allow read: if liberado();
-        allow create: if equipe() || (liberado() && request.resource.data.criadoPorEmail == email());
-        allow update, delete: if equipe() || (liberado() && resource.data.criadoPorEmail == email());
+        allow create: if equipe() || (liberado() && request.resource.data.criadoPorEmail == email() && !("status" in request.resource.data));
+        allow update: if equipe();
+        allow delete: if equipe() || (liberado() && resource.data.criadoPorEmail == email());
       }
 
       // Recados: todos escrevem; apaga quem escreveu ou a equipe.
