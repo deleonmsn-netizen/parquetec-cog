@@ -897,7 +897,8 @@ function vGerenciar() {
   const permAvisos = "Notification" in window ? Notification.permission : "indisponivel";
   const avisos = isEquipe() && HOSTED ? `<section class="card stack"><h2 style="font-size:17px">Avisos neste aparelho</h2>
     <p class="note" style="margin:0">Mostra um aviso quando um professor agenda ou pede acesso, enquanto o app estiver aberto (mesmo minimizado).${CONF.avisoEmail ? " A coordenação também recebe por e-mail." : ""}</p>
-    ${permAvisos === "granted" ? `<span class="badge" style="align-self:flex-start">ativados</span>` : permAvisos === "denied" ? `<p class="note" style="margin:0">Bloqueados pelo navegador. Libere em Configurações do site → Notificações.</p>` : `<button class="btn ghost block" data-act="avisos-ativar">Ativar avisos</button>`}</section>` : "";
+    ${permAvisos === "granted" ? `<span class="badge" style="align-self:flex-start">ativados</span>` : permAvisos === "denied" ? `<p class="note" style="margin:0">Bloqueados pelo navegador. Libere em Configurações do site → Notificações.</p>` : `<button class="btn ghost block" data-act="avisos-ativar">Ativar avisos</button>`}
+    ${CONF.avisoEmail && isAdmin() ? `<button class="btn ghost block" data-act="email-teste">Mandar e-mail de teste para ${esc(CONF.dono || "a coordenação")}</button>` : ""}</section>` : "";
   if (aba === "equip") return `${segAbas}
     <section class="card stack">
       <div><h2 style="font-size:17px">Manutenção e baixa</h2><p class="note" style="margin:4px 0 0">Toque no código para mandar o equipamento para manutenção ou dar baixa. Se ele estiver em uso, a devolução é registrada sozinha.</p></div>
@@ -1518,6 +1519,10 @@ const acts = {
     } else t.disabled = false;
   },
   async recusar(t) { const k = "pd:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; t.textContent = "confirmar"; t.classList.add("warn"); return; } ui.armed = null; await write(() => DB.doc("pedidos/" + t.dataset.id).update({ status: "recusado" }), "Pedido recusado"); },
+  "email-teste"() {
+    avisarEmail({ tipo: "agendamento", pessoa: "Teste do ParqueTEC", data: fmtLong.format(new Date()), aula: "teste de configuração", itens: "nenhum equipamento (é só um teste)", obs: "Se este e-mail chegou, o aviso por e-mail está funcionando." });
+    toast("Teste enviado. Confira a caixa de entrada (e o spam) em 1 minuto.", 6000);
+  },
   async "avisos-ativar"() {
     if (!("Notification" in window)) return toast("Este navegador não mostra avisos. No iPhone, instale o app na Tela de Início primeiro.", 6000);
     const r = await Notification.requestPermission(); render();
