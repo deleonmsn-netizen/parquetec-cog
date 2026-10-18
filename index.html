@@ -29,7 +29,7 @@
   --ok-bg:#e3f4ae; --ok-ink:#3a5400; --use-bg:#cdeff8; --use-ink:#0a5a70;
   --stop-bg:#fde0d6; --stop-ink:#97320f; --park-bg:#e2e7ed; --park-ink:#27323d;
   --go:#86c51f; --go-ink:#203300; --back:#93d7ee; --back-ink:#073b4b;
-  --danger:#c0352b; --danger-soft:#fbe4e1; --shadow:0 1px 2px rgba(30,38,46,.06),0 6px 20px rgba(30,38,46,.06);
+  --bar:#2f6f8f; --danger:#c0352b; --danger-soft:#fbe4e1; --shadow:0 1px 2px rgba(30,38,46,.06),0 6px 20px rgba(30,38,46,.06);
   --f-display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
   --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --r:14px; --r-sm:10px;
@@ -40,7 +40,7 @@
   --ok-bg:#2b3a10; --ok-ink:#cdee86; --use-bg:#0f3845; --use-ink:#a2e4f6;
   --stop-bg:#42231a; --stop-ink:#ffb59c; --park-bg:#26313c; --park-ink:#cfdae5;
   --go:#7ab51a; --go-ink:#162400; --back:#5fb8d6; --back-ink:#062a36;
-  --danger:#ff7a6e; --danger-soft:#3d1c1a; --shadow:0 1px 2px rgba(0,0,0,.3);
+  --bar:#7cc0dc; --danger:#ff7a6e; --danger-soft:#3d1c1a; --shadow:0 1px 2px rgba(0,0,0,.3);
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#13171c; --surface:#1b2128; --surface-2:#222932; --ink:#ebeef1; --muted:#9ca7b2; --line:#2d3540;
@@ -48,7 +48,7 @@
   --ok-bg:#2b3a10; --ok-ink:#cdee86; --use-bg:#0f3845; --use-ink:#a2e4f6;
   --stop-bg:#42231a; --stop-ink:#ffb59c; --park-bg:#26313c; --park-ink:#cfdae5;
   --go:#7ab51a; --go-ink:#162400; --back:#5fb8d6; --back-ink:#062a36;
-  --danger:#ff7a6e; --danger-soft:#3d1c1a; --shadow:0 1px 2px rgba(0,0,0,.3);
+  --bar:#7cc0dc; --danger:#ff7a6e; --danger-soft:#3d1c1a; --shadow:0 1px 2px rgba(0,0,0,.3);
   color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -224,6 +224,17 @@ nav.tabs .pip{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;heig
 .plate{background:var(--plate);border-radius:var(--r);padding:14px;display:grid;place-items:center}
 .plate img{width:200px;height:auto}
 .steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.rtiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.rtile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.rtile b{font-family:var(--f-display);font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.rtile span{font-size:12.5px;color:var(--muted)}
+.bars{display:flex;flex-direction:column;gap:2px}
+.bar-r{display:grid;grid-template-columns:minmax(0,10rem) minmax(0,1fr) auto;gap:10px;align-items:center;padding:4px 0}
+.bar-l{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-t{height:10px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.bar-f{display:block;height:100%;background:var(--bar);border-radius:0 4px 4px 0;min-width:2px}
+.bar-v{font-size:13px;font-variant-numeric:tabular-nums;color:var(--ink);min-width:2.5em;text-align:right}
+@media (max-width:420px){.bar-r{grid-template-columns:minmax(0,7rem) minmax(0,1fr) auto}}
 .imp{display:flex;flex-direction:column;gap:8px;border:1px dashed var(--line);border-radius:var(--r-sm);padding:12px}
 #print{display:none}
 @media print{
@@ -233,6 +244,10 @@ nav.tabs .pip{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;heig
   body::before{display:none!important}
   body>*:not(#print){display:none!important}
   #print{display:block!important;color:#111;font-family:var(--f-body)}
+  #print *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print .rtiles{grid-template-columns:repeat(5,1fr)} #print .rtile{border-color:#bbb;background:#fff} #print .rtile span{color:#444}
+  #print .bar-t{background:#eee} #print .bar-f{background:#555} #print .bar-v,#print .bar-l{color:#111}
+  #print .rsec{break-inside:avoid;margin-top:5mm} #print .rsec h2{font-size:12pt;margin:0 0 2mm}
   .etqs{display:grid;grid-template-columns:repeat(3,1fr)}
   .lst-h{display:flex;align-items:center;gap:4mm;margin-bottom:4mm}
   .lst-h img{width:16mm;height:16mm;object-fit:contain}
@@ -359,7 +374,8 @@ function localDB() {
   };
   return {
     doc: docRef,
-    collection: (col) => ({ ...query(col), path: col, doc: (id) => docRef(col + "/" + (id || uid())), add: async (v) => { const r = docRef(col + "/" + uid()); await r.set(v); return r; } })
+    collection: (col) => ({ ...query(col), path: col, doc: (id) => docRef(col + "/" + (id || uid())), add: async (v) => { const r = docRef(col + "/" + uid()); await r.set(v); return r; } }),
+    umaVez: async (path, campo) => { const d = data[path]; if (!d || d[campo]) return false; d[campo] = Date.now(); save(); return true; }
   };
 }
 
@@ -401,7 +417,8 @@ async function firebaseDB(conf) {
     };
   };
   return {
-    db: { doc: docRef, collection: (col) => ({ ...query(col), path: col, doc: (id) => docRef(col + "/" + (id || uid())) }) },
+    db: { doc: docRef, collection: (col) => ({ ...query(col), path: col, doc: (id) => docRef(col + "/" + (id || uid())) }),
+      umaVez: (path, campo) => fs.runTransaction(db, async (tx) => { const r = fs.doc(db, P(path)), d = await tx.get(r); if (!d.exists() || d.data()[campo]) return false; tx.update(r, { [campo]: Date.now() }); return true; }).catch(() => false) },
     onAuth: (fn) => au.onAuthStateChanged(auth, fn),
     login: (email, senha) => au.signInWithEmailAndPassword(auth, email, senha),
     reset: (email) => au.sendPasswordResetEmail(auth, email),
@@ -425,14 +442,14 @@ const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [
 const CONF = window.PARQUETEC_FIREBASE || {};
 const meuEmail = () => String(AUTH && AUTH.email || "").toLowerCase();
 const souDono = () => !!(CONF.dono && meuEmail() === String(CONF.dono).toLowerCase());
-const meuAcesso = () => S.acessos.find(a => a.id === meuEmail());
+const meuAcesso = () => S.meuAc || S.acessos.find(a => a.id === meuEmail());
 // Fora do Firebase não há logins: quem abre o app pode tudo.
 const isAdmin = () => MODE !== "firebase" || souDono() || (meuAcesso() || {}).papel === "admin";
 // Equipe = coordenação e operadores: registram retiradas e devoluções. Professor só agenda.
 const isEquipe = () => isAdmin() || (meuAcesso() || {}).papel === "operador";
 const isProfessor = () => MODE === "firebase" && !isEquipe() && (meuAcesso() || {}).papel === "professor";
 const PAPEIS = { admin: "Coordenação", operador: "Operador", professor: "Professor" };
-function minhaPessoa() { const a = meuAcesso() || {}; return pessoa(a.pessoaId) || { id: "login:" + meuEmail(), nome: a.nome || meuEmail(), cargo: PAPEIS[a.papel] || "" }; }
+function minhaPessoa() { const a = meuAcesso() || {}; return pessoa(a.pessoaId) || { id: a.pessoaId || "login:" + meuEmail(), nome: a.nome || meuEmail(), cargo: PAPEIS[a.papel] || "" }; }
 // Aviso por e-mail para a coordenação (Google Apps Script da escola, se configurado no config.js).
 function avisarEmail(dados) {
   if (!CONF.avisoEmail) return;
@@ -450,7 +467,7 @@ function avisarAparelho(titulo, corpo) {
 }
 const ui = {
   tab: store.get("tab", "painel"), tipo: "NB", seg: store.get("seg", "medio"), date: dayKey(),
-  histQ: "", histLimit: 300, gerTipo: "NB", gerQ: "", showInativos: false, armed: null, unlocked: false
+  histQ: "", histLimit: 100, histModo: "lista", rel: { periodo: "mes" }, gerTipo: "NB", gerQ: "", showInativos: false, armed: null, unlocked: false
 };
 // "Quem está usando" fica guardado por login, para aparelhos compartilhados.
 const opKey = () => "operador" + (AUTH ? ":" + meuEmail() : "");
@@ -459,7 +476,7 @@ const unsub = {};
 
 function defaultConfig() {
   return {
-    escola: "", notebooks: 0, tablets: 0, whatsapp: "", pinHash: "",
+    escola: "", notebooks: 0, tablets: 0, whatsapp: "", pinHash: "", limite: "18:00",
     horarios: {
       medio: [["1ª aula", "07:00", "07:50"], ["2ª aula", "07:50", "08:40"], ["3ª aula", "08:40", "09:30"], ["4ª aula", "09:50", "10:40"], ["5ª aula", "10:40", "11:30"], ["6ª aula", "11:30", "12:20"]].map(([nome, ini, fim]) => ({ nome, ini, fim })),
       fund: [["1ª aula", "13:00", "13:50"], ["2ª aula", "13:50", "14:40"], ["3ª aula", "14:40", "15:30"], ["4ª aula", "15:50", "16:40"], ["5ª aula", "16:40", "17:30"]].map(([nome, ini, fim]) => ({ nome, ini, fim }))
@@ -480,7 +497,7 @@ const docsOf = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
 function subscribeAll() {
   listen("config", DB.doc("config/main"), s => { S.config = s.exists ? { ...defaultConfig(), ...s.data() } : null; S.configLoaded = true; });
-  listen("pessoas", DB.collection("pessoas"), s => { S.pessoas = docsOf(s).sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1); });
+  if (MODE !== "firebase") subscribePessoas();
   listen("abertos", DB.collection("emprestimos").where("aberto", "==", true), s => {
     const antes = new Set(S.abertos.flatMap(e => aConferir(e).map(c => e.id + c))), primeira = !S.abertosOk;
     S.abertos = docsOf(s).sort((a, b) => b.retiradoEm - a.retiradoEm); S.abertosOk = true;
@@ -489,28 +506,37 @@ function subscribeAll() {
   });
   listen("parados", DB.collection("parados"), s => { S.parados = docsOf(s); });
   listen("inv", DB.doc("config/inventario"), s => { S.inv = s.exists ? (s.data().itens || {}) : {}; });
-  listen("recados", DB.collection("recados").orderBy("em", "desc").limit(60), s => { S.recados = docsOf(s); });
-  subscribeHist(); subscribeReservas(); subscribeResHoje();
+  listen("recados", DB.collection("recados").orderBy("em", "desc").limit(30), s => { S.recados = docsOf(s); });
+  if (ui.tab === "historico") subscribeHist();
+  subscribeReservas(); subscribeResHoje();
   if (MODE !== "firebase") subscribeFuturas();
   if (MODE === "firebase") listen("meuPedido", DB.doc("pedidos/" + meuEmail()), s => {
     const tinha = S.pedidoNoServidor; S.pedidoNoServidor = s.exists; S.meuPedido = s.exists ? s.data() : S.meuPedido;
     // Pedido aprovado (apagado) enquanto a pessoa esperava: abre o app.
     if (tinha && !s.exists && ui.semAcesso) location.reload();
   });
-  if (MODE === "firebase") listen("acessos", DB.collection("acessos"), s => {
+  // Leituras do Firebase contam no limite grátis: cada um baixa só o que usa.
+  if (MODE === "firebase") listen("meuAc", DB.doc("acessos/" + meuEmail()), s => { S.meuAc = s.exists ? { id: s.id, ...s.data() } : null; aposAcesso(); });
+}
+function aposAcesso() {
+  if (isEquipe() && !unsub.pessoas) subscribePessoas();
+  if (isEquipe() && !unsub.futuras) subscribeFuturas();
+  if (isEquipe() && !unsub.acessos) listen("acessos", DB.collection("acessos"), s => {
     S.acessos = docsOf(s);
-    if (isEquipe() && !unsub.futuras) subscribeFuturas();
     if (isAdmin() && !unsub.pedidos) listen("pedidos", DB.collection("pedidos"), q => {
       const antes = new Set(S.pedidos.map(x => x.id)), primeira = !S.pedidosOk;
       S.pedidos = docsOf(q).filter(x => x.status !== "recusado"); S.pedidosOk = true;
       if (!primeira) for (const x of S.pedidos) if (!antes.has(x.id)) avisarAparelho("Pedido de acesso", `${x.nome} (${x.id}) quer entrar no app.`);
     });
-    const a = meuAcesso();
-    if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: PAPEIS[a.papel] || "" }; store.set(opKey(), operador); }
-    else if (!operador && souDono()) { operador = { id: "login:" + meuEmail(), nome: "Coordenação", cargo: "" }; store.set(opKey(), operador); }
   });
+  const a = meuAcesso();
+  if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: PAPEIS[a.papel] || "" }; store.set(opKey(), operador); }
+  else if (!operador && souDono()) { operador = { id: "login:" + meuEmail(), nome: "Coordenação", cargo: "" }; store.set(opKey(), operador); }
 }
+function subscribePessoas() { listen("pessoas", DB.collection("pessoas"), s => { S.pessoas = docsOf(s).sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1); }); }
 function subscribeHist() { listen("hist", DB.collection("emprestimos").orderBy("retiradoEm", "desc").limit(ui.histLimit), s => { S.hist = docsOf(s); }); }
+// Histórico só é baixado quando a aba é aberta.
+function garantirHist() { if (!unsub.hist && DB) subscribeHist(); }
 function subscribeFuturas() {
   listen("futuras", DB.collection("reservas").where("data", ">=", dayKey()), s => {
     const antes = new Set(S.futuras.map(r => r.id)), primeira = !S.futurasOk;
@@ -577,6 +603,20 @@ function codeGrid(codes, btn) {
   return [...g].map(([m, l]) => `<div class="grp"><span>${esc(m || "Sem modelo")}</span><span>${l.length}</span></div><div class="codes">${l.map(btn).join("")}</div>`).join("");
 }
 const ativa = (r) => r.status !== "recusado";
+// Até quando a retirada deve voltar: fim da aula agendada (+30 min) ou o horário limite do dia.
+function prazoDevolucao(st) {
+  const r = st.resId && [...S.reservas, ...S.resHoje].find(x => x.id === st.resId);
+  const a = r && (cfg().horarios[r.seg] || [])[r.aula];
+  if (a && /^\d\d:\d\d$/.test(a.fim || "")) { const [h, m] = a.fim.split(":").map(Number), d = keyToDate(r.data); d.setHours(h, m + 30, 0, 0); return d.getTime(); }
+  const [h, m] = String(cfg().limite || "18:00").split(":").map(Number), d = new Date();
+  d.setHours(isNaN(h) ? 18 : h, isNaN(m) ? 0 : m, 0, 0);
+  if (d.getTime() < Date.now() + 30 * 60000) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+const prazoDe = (e) => e.devolverAte || (() => { const d = new Date(e.retiradoEm); d.setHours(23, 59, 0, 0); return d.getTime(); })();
+const atrasado = (e) => pendentes(e).length > aConferirN(e) && Date.now() > prazoDe(e);
+const aConferirN = (e) => Object.keys(e.aDevolver || {}).filter(c => !(e.devolvidos || {})[c] && (e.codes || []).includes(c)).length;
+const fmtPrazo = (t) => { const k = dayKey(new Date(t)); return `${k === dayKey() ? "hoje" : dayLabel(k)[0] === "Ontem" ? "ontem" : k.split("-").reverse().slice(0, 2).join("/")} às ${hhmm(t)}`; };
 // Avisa quando o agendamento é de alguém que saiu (login removido ou pessoa desativada).
 function alertaRes(r) {
   const ps = pessoa(r.pessoaId);
@@ -635,7 +675,7 @@ function renderTabs() {
   const seen = store.get("recadosVistos", 0), agVista = store.get("agendaVista", 0);
   const novosAg = isEquipe() ? S.futuras.filter(r => r.criadoEm > agVista && r.criadoPorEmail && r.criadoPorEmail !== meuEmail()).length : 0;
   const pedidos = isAdmin() ? S.pedidos.length : 0;
-  const conferir = isEquipe() ? S.abertos.filter(e => aConferir(e).length).length : 0;
+  const conferir = S.abertos.filter(e => (isEquipe() && aConferir(e).length) || (atrasado(e) && (isEquipe() || e.responsavelEmail === meuEmail()))).length;
   const novos = S.recados.filter(r => r.em > seen && r.autorId !== (operador && operador.id)).length;
   const wa = String(cfg().whatsapp || "").replace(/\D/g, "");
   let h = TABS.map(([k, l]) => `<button data-act="tab" data-v="${k}" ${ui.tab === k ? 'aria-current="page"' : ""}>${icon(k)}${l}${k === "recados" && novos && ui.tab !== "recados" ? `<span class="pip">${novos}</span>` : ""}${k === "agenda" && novosAg && ui.tab !== "agenda" ? `<span class="pip">${novosAg}</span>` : ""}${k === "gerenciar" && pedidos ? `<span class="pip">${pedidos}</span>` : ""}${k === "painel" && conferir && ui.tab !== "painel" ? `<span class="pip">${conferir}</span>` : ""}</button>`).join("");
@@ -754,7 +794,7 @@ function agendadosHoje(t) {
   const ordem = (r) => (r.seg === "medio" ? 0 : 100) + (Number(r.aula) || 0);
   const lista = S.resHoje.filter(r => r.tipo === t && (ativa(r) || r.criadoPorEmail === meuEmail())).sort((a, b) => ordem(a) - ordem(b));
   if (!lista.length) return "";
-  const feito = (r) => S.abertos.some(e => e.reservaId === r.id) || S.hist.some(e => e.reservaId === r.id);
+  const feito = (r) => r.retirado || S.abertos.some(e => e.reservaId === r.id);
   const rows = lista.map(r => { const a = (cfg().horarios[r.seg] || [])[r.aula] || {};
     const al = isEquipe() && ativa(r) ? alertaRes(r) : "";
     return `<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:180px"><div class="t">${esc(r.pessoaNome)}${al ? ` <span class="badge late">${al}</span>` : ""}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) && r.motivo && r.motivo !== "recusado pela coordenação" ? ` · ${esc(r.motivo)}` : ""}</div></div>
@@ -783,10 +823,10 @@ function vPainel() {
     lista = `<div class="empty"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M8 12l3 3 5-6"/></svg>Tudo devolvido. Nada pendente.</div>`;
   } else {
     lista = `<div class="list">${abertos.map(e => {
-      const pend = pendentes(e), velho = dayKey(new Date(e.retiradoEm)) !== hoje, conf = aConferir(e), meu = e.responsavelEmail && e.responsavelEmail === meuEmail();
+      const pend = pendentes(e), conf = aConferir(e), meu = e.responsavelEmail && e.responsavelEmail === meuEmail(), atr = atrasado(e);
       return `<div class="row"><div class="grow">
-          <div class="t">${esc(e.pessoaNome)} ${velho ? `<span class="badge late">desde ${esc(dayLabel(dayKey(new Date(e.retiradoEm)))[0] || fmtLong.format(new Date(e.retiradoEm)))}</span>` : ""}</div>
-          <div class="s">${esc(e.finalidade)}${e.turma ? " · " + esc(e.turma) : ""} · retirou às ${hhmm(e.retiradoEm)} · ${esc(resumoCodes(pend, e.tipo))}</div>
+          <div class="t">${esc(e.pessoaNome)} ${atr ? `<span class="badge late">atrasado</span>` : ""}</div>
+          <div class="s">${esc(e.finalidade)}${e.turma ? " · " + esc(e.turma) : ""} · retirou ${dayKey(new Date(e.retiradoEm)) === hoje ? "às " + hhmm(e.retiradoEm) : fmtPrazo(e.retiradoEm)} · ${esc(resumoCodes(pend, e.tipo))} · ${atr ? `<b style="color:var(--danger)">devia voltar ${fmtPrazo(prazoDe(e))}</b>` : `volta até ${fmtPrazo(prazoDe(e))}`}</div>
           <div class="chips">${pend.map(c => `<span class="chip ${conf.includes(c) ? "conf" : ""}" title="${esc(conf.includes(c) ? "Devolvido pelo professor, falta conferir" : dicaCod(c))}">${c}</span>`).join("")}</div>
           ${conf.length ? `<div class="s" style="color:var(--stop-ink);margin-top:4px">${conf.length} marcado${conf.length === 1 ? "" : "s"} como devolvido${conf.length === 1 ? "" : "s"} · falta a coordenação conferir</div>` : ""}
         </div>${isEquipe() ? (conf.length ? `<button class="btn back sm" data-act="conferir" data-id="${e.id}">Conferir</button>` : `<button class="btn back sm" data-act="devolver" data-id="${e.id}">Devolver</button>`)
@@ -794,13 +834,16 @@ function vPainel() {
     }).join("")}</div>`;
   }
   const quem = operador || !isEquipe() ? "" : `<div class="install"><div class="grow"><b>Quem está usando este aparelho?</b>O nome escolhido aparece como “autorizado por” nas retiradas.</div><button class="btn sm" data-act="operador">Escolher</button></div>`;
+  const atrs = S.abertos.filter(e => atrasado(e) && (isEquipe() || e.responsavelEmail === meuEmail()));
+  const atrasos = atrs.length ? `<section class="card" style="border-color:var(--danger)"><div class="sec-h"><h2 style="color:var(--danger)">${isEquipe() ? "Devoluções atrasadas" : "Sua devolução está atrasada"}</h2><span class="note">${atrs.length}</span></div>
+    <div class="list">${atrs.map(e => { const pend = pendentes(e).filter(c => !aConferir(e).includes(c)); return `<div class="row"><div class="grow"><div class="t">${esc(e.pessoaNome)}</div><div class="s">${esc(resumoCodes(pend, e.tipo))} · devia voltar ${fmtPrazo(prazoDe(e))} · ${pend.join(", ")}</div></div>${isEquipe() ? `<button class="btn back sm" data-act="devolver" data-id="${e.id}">Devolver</button>` : e.responsavelEmail === meuEmail() ? `<button class="btn back sm" data-act="devolvi" data-id="${e.id}">Devolvi</button>` : ""}</div>`; }).join("")}</div></section>` : "";
   const confs = isEquipe() ? S.abertos.filter(e => aConferir(e).length) : [];
   const conferir = confs.length ? `<section class="card" style="border-color:var(--stop-ink)"><div class="sec-h"><h2>Devoluções para conferir</h2><span class="note">${confs.length}</span></div>
-    <div class="list">${confs.map(e => { const c = aConferir(e), x = e.aDevolver[c[0]] || {}; return `<div class="row"><div class="grow"><div class="t">${esc(e.pessoaNome)}</div><div class="s">Marcou ${esc(resumoCodes(c, e.tipo))} como devolvido${x.em ? ` às ${hhmm(x.em)}` : ""} · ${c.join(", ")}</div></div><button class="btn back sm" data-act="conferir" data-id="${e.id}">Conferir</button></div>`; }).join("")}</div></section>` : "";
-  return `${quem}${conferir}${installCard()}${tipoSeg("", ui.tipo, "tipo")}
+    <div class="list">${confs.map(e => { const c = aConferir(e), x = e.aDevolver[c[0]] || {}; return `<div class="row"><div class="grow"><div class="t">${esc(e.pessoaNome)}</div><div class="s">Marcou ${esc(resumoCodes(c, e.tipo))} como devolvido${x.em ? ` às ${hhmm(x.em)}` : ""} · ${c.join(", ")}${x.problema ? `<br><b style="color:var(--stop-ink)">Problema: ${esc(x.problema)}</b>` : ""}</div></div><button class="btn back sm" data-act="conferir" data-id="${e.id}">Conferir</button></div>`; }).join("")}</div></section>` : "";
+  return `${quem}${atrasos}${conferir}${installCard()}${tipoSeg("", ui.tipo, "tipo")}
     <div class="tiles">
       <div class="tile t-ok"><span class="lbl">Disponíveis</span><span class="num">${st.disp}</span></div>
-      <div class="tile t-use"><span class="lbl">Em uso</span><span class="num">${st.emUso}</span></div>
+      <div class="tile t-use"><span class="lbl">Em uso${(() => { const n = S.abertos.filter(e => e.tipo === ui.tipo && atrasado(e)).length; return n ? ` · <b style="color:var(--danger)">${n} atrasad${n === 1 ? "o" : "os"}</b>` : ""; })()}</span><span class="num">${st.emUso}</span></div>
       <div class="tile t-stop"><span class="lbl">Parados</span><span class="num">${st.parados}</span></div>
       <div class="tile t-park"><span class="lbl">Total no parque</span><span class="num">${st.parque}</span></div>
     </div>
@@ -856,7 +899,81 @@ function vRecados() {
     ${S.recados.length ? pins.concat(rest).map(item).join("") : `<div class="card empty">Nenhum recado ainda. O que for escrito aqui aparece para todos que usam o app.</div>`}`;
 }
 
+/* ---------- Relatório de uso ---------- */
+const PERIODOS = { mes: "Este mês", passado: "Mês passado", d30: "Últimos 30 dias", ano: "Este ano" };
+function periodo(k) {
+  const n = new Date(), ini = new Date(n.getFullYear(), n.getMonth(), 1);
+  if (k === "passado") return [new Date(n.getFullYear(), n.getMonth() - 1, 1).getTime(), ini.getTime()];
+  if (k === "d30") return [Date.now() - 30 * 864e5, Date.now() + 864e5];
+  if (k === "ano") return [new Date(n.getFullYear(), 0, 1).getTime(), Date.now() + 864e5];
+  return [ini.getTime(), Date.now() + 864e5];
+}
+async function carregarRelatorio() {
+  const per = ui.rel.periodo, [ini, fim] = periodo(per);
+  ui.rel.carregando = per; render();
+  try {
+    const q = await DB.collection("emprestimos").where("retiradoEm", ">=", ini).limit(3000).get();
+    const lista = q.docs.map(d => ({ id: d.id, ...d.data() })).filter(e => e.retiradoEm < fim);
+    ui.rel.dados = calcRelatorio(lista); ui.rel.dadosPer = per;
+  } catch (e) { console.warn(e); toast("Não deu para montar o relatório agora. Confira a internet."); }
+  ui.rel.carregando = null; render();
+}
+function calcRelatorio(lista) {
+  const conta = () => new Map(), soma = (m, k, n = 1) => m.set(k, (m.get(k) || 0) + n);
+  const pessoasEq = conta(), pessoasRet = conta(), turmas = conta(), modelos = conta(), dias = conta(), fins = conta();
+  let equip = 0, atrasos = 0, defeitos = 0;
+  const DS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+  for (const e of lista) {
+    const n = (e.codes || []).length; equip += n;
+    soma(pessoasEq, e.pessoaNome || "Sem nome", n); soma(pessoasRet, e.pessoaNome || "Sem nome");
+    soma(turmas, e.turma || "Sem turma", n); soma(fins, e.finalidade || "Outro", n);
+    soma(dias, DS[new Date(e.retiradoEm).getDay()], n);
+    for (const c of e.codes || []) soma(modelos, inv(c).modelo || "Sem modelo");
+    const dev = Object.values(e.devolvidos || {});
+    if (dev.some(d => d.atrasado) || (pendentes(e).length && Date.now() > prazoDe(e))) atrasos++;
+    defeitos += dev.filter(d => d.defeito).length;
+  }
+  const ord = (m) => [...m].sort((a, b) => b[1] - a[1]);
+  const diasOrd = DS.slice(1).concat(DS[0]).filter(d => dias.has(d)).map(d => [d, dias.get(d)]);
+  return { retiradas: lista.length, equip, pessoas: pessoasEq.size, atrasos, defeitos, porPessoa: ord(pessoasEq).map(([k, v]) => [k, v, pessoasRet.get(k)]), porTurma: ord(turmas), porModelo: ord(modelos), porDia: diasOrd, porFin: ord(fins) };
+}
+function barras(linhas, unidade, max = 10) {
+  if (!linhas.length) return `<div class="note">Nada no período.</div>`;
+  const mostrar = linhas.slice(0, max), topo = Math.max(...mostrar.map(l => l[1]), 1);
+  return `<div class="bars">${mostrar.map(([k, v, extra]) => `<div class="bar-r" title="${esc(k)}: ${v} ${unidade}${extra ? ` em ${extra} retirada${extra === 1 ? "" : "s"}` : ""}"><span class="bar-l">${esc(k)}</span><span class="bar-t"><span class="bar-f" style="width:${Math.round(v / topo * 100)}%"></span></span><span class="bar-v">${v}</span></div>`).join("")}</div>
+    ${linhas.length > max ? `<div class="note">e mais ${linhas.length - max}</div>` : ""}`;
+}
+function corpoRelatorio(D) {
+  return `<div class="rtiles">
+      <div class="rtile"><b>${D.retiradas}</b><span>${D.retiradas === 1 ? "retirada" : "retiradas"}</span></div>
+      <div class="rtile"><b>${D.equip}</b><span>${D.equip === 1 ? "equipamento emprestado" : "equipamentos emprestados"}</span></div>
+      <div class="rtile"><b>${D.pessoas}</b><span>${D.pessoas === 1 ? "pessoa atendida" : "pessoas atendidas"}</span></div>
+      <div class="rtile"><b>${D.atrasos}</b><span>${D.atrasos === 1 ? "devolução atrasada" : "devoluções atrasadas"}</span></div>
+      <div class="rtile"><b>${D.defeitos}</b><span>${D.defeitos === 1 ? "voltou com defeito" : "voltaram com defeito"}</span></div>
+    </div>
+    <section class="card rsec"><h2 style="font-size:16px">Quem mais usou <span class="note">(equipamentos)</span></h2>${barras(D.porPessoa, "equipamentos")}</section>
+    <section class="card rsec"><h2 style="font-size:16px">Por turma <span class="note">(equipamentos)</span></h2>${barras(D.porTurma, "equipamentos")}</section>
+    <section class="card rsec"><h2 style="font-size:16px">Por modelo <span class="note">(vezes emprestado)</span></h2>${barras(D.porModelo, "vezes", 12)}</section>
+    <section class="card rsec"><h2 style="font-size:16px">Por dia da semana <span class="note">(equipamentos)</span></h2>${barras(D.porDia, "equipamentos", 7)}</section>
+    <section class="card rsec"><h2 style="font-size:16px">Por finalidade <span class="note">(equipamentos)</span></h2>${barras(D.porFin, "equipamentos", 6)}</section>`;
+}
+function vRelatorio() {
+  const R = ui.rel;
+  if (R.dadosPer !== R.periodo && R.carregando !== R.periodo) setTimeout(carregarRelatorio);
+  const D = R.dadosPer === R.periodo ? R.dados : null;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <label class="f" style="flex:1;min-width:170px">Período<select class="inp" id="rel-per">${Object.entries(PERIODOS).map(([k, l]) => `<option value="${k}" ${R.periodo === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      ${D && HOSTED ? `<button class="btn ghost sm" data-act="rel-imprimir">Imprimir</button>` : ""}${D && downloads ? `<button class="btn ghost sm" data-act="rel-csv">Baixar planilha</button>` : ""}
+    </div>
+    ${D ? corpoRelatorio(D) : `<div class="card empty">Montando o relatório…</div>`}`;
+}
+
 function vHistorico() {
+  const seg = isEquipe() ? `<div class="seg small" role="group" aria-label="Histórico ou relatório"><button data-act="hist-modo" data-v="lista" aria-pressed="${ui.histModo !== "rel"}">Retiradas</button><button data-act="hist-modo" data-v="rel" aria-pressed="${ui.histModo === "rel"}">Relatório de uso</button></div>` : "";
+  if (ui.histModo === "rel" && isEquipe()) return seg + vRelatorio();
+  return seg + vHistoricoLista();
+}
+function vHistoricoLista() {
   const q = norm(ui.histQ);
   const rows = S.hist.filter(e => !q || norm([e.pessoaNome, e.turma, e.finalidade, e.operador, ...(e.codes || [])].join(" ")).includes(q));
   const byDay = new Map();
@@ -872,7 +989,9 @@ function vHistorico() {
         return `<div class="row"><span class="dot ${pend.length ? "open" : ""}"></span><div class="grow">
           <div class="t">${esc(e.pessoaNome)}${e.turma ? ` <span class="note">· ${esc(e.turma)}</span>` : ""}</div>
           <div class="s">${esc(e.finalidade)} · ${esc(resumoCodes(e.codes || [], e.tipo))} · ${estado}${e.operador ? ` · autorizado por ${esc(e.operador)}` : ""}${e.obs ? ` · ${esc(e.obs)}` : ""}</div>
-          <div class="chips">${(e.codes || []).map(c => `<span class="chip ${dev[c] ? "done" : ""}">${c}</span>`).join("")}</div>
+          <div class="chips">${(e.codes || []).map(c => `<span class="chip ${dev[c] ? (dev[c].defeito ? "conf" : "done") : ""}" title="${esc(dev[c] && dev[c].defeito ? "Voltou com problema: " + dev[c].defeito : "")}">${c}</span>`).join("")}</div>
+          ${Object.entries(dev).filter(([, d]) => d.defeito).length ? `<div class="s" style="color:var(--stop-ink)">Com problema: ${Object.entries(dev).filter(([, d]) => d.defeito).map(([c, d]) => `${c} (${esc(d.defeito)})`).join(", ")}</div>` : ""}
+          ${Object.values(dev).some(d => d.atrasado) || (pend.length && Date.now() > prazoDe(e)) ? `<div class="s" style="color:var(--danger)">Devolução atrasada</div>` : ""}
         </div><span class="time">${hhmm(e.retiradoEm)}</span></div>`;
       }).join("")}</div></section>`;
   }
@@ -942,6 +1061,8 @@ function vGerenciar() {
         <label class="f">Tablets<input class="inp" id="c-tb" type="number" min="0" max="200" inputmode="numeric" value="${Number(c.tablets) || 0}"></label>
       </div>
       <p class="note" style="margin:0">Os códigos vão de NB-001 a NB-${String(Number(c.notebooks) || 0).padStart(3, "0")} e de TB-001 a TB-${String(Number(c.tablets) || 0).padStart(3, "0")}. Máximo de 200 de cada.</p>
+      <label class="f">Horário limite para devolver (retiradas sem agendamento)<input class="inp" id="c-limite" type="time" value="${esc(c.limite || "18:00")}"></label>
+      <p class="note" style="margin:0">Com agendamento, o prazo é o fim da aula mais 30 minutos. Depois do prazo, a retirada aparece como atrasada e a coordenação é avisada.</p>
       <h2 style="font-size:17px;margin-top:6px">Horários das aulas</h2>
       ${Object.entries(SEGS).map(([seg, l]) => `<div class="stack" style="gap:8px"><div class="step">${l}</div>${hor(seg)}<button class="mini" style="align-self:flex-start" data-act="h-add" data-seg="${seg}">+ adicionar aula</button></div>`).join("")}
       <h2 style="font-size:17px;margin-top:6px">Contato</h2>
@@ -1181,7 +1302,10 @@ function responsavelDe(st) {
 }
 const aConferir = (e) => Object.keys(e.aDevolver || {}).filter(c => !(e.devolvidos || {})[c] && (e.codes || []).includes(c)).sort();
 function openDevolver(id, pre) {
-  const st = { live: true, q: "", sel: new Set(), only: id || null };
+  const st = { live: true, q: "", sel: new Set(), only: id || null, def: new Set(), defMotivo: "", defAberto: false };
+  const e0 = id && S.abertos.find(e => e.id === id);
+  const relato = e0 && Object.values(e0.aDevolver || {}).map(x => x.problema).filter(Boolean)[0];
+  if (relato) { st.defMotivo = relato; st.defAberto = true; st.relato = relato; }
   const list = id ? S.abertos.filter(e => e.id === id) : S.abertos;
   list.forEach(e => (pre || pendentes(e)).forEach(c => st.sel.add(c)));
   if (!id) st.sel.clear();
@@ -1201,6 +1325,7 @@ function mDevolvi(st) {
     <p class="note" style="margin:0">Toque nos códigos que você entregou. A coordenação recebe um aviso e confere; depois disso eles voltam a ficar disponíveis.</p>
     <div class="codes">${livres.map(c => `<button class="code" data-act="dv-code" data-v="${c}" aria-pressed="${st.sel.has(c)}">${c}</button>`).join("") || `<span class="note">Todos já foram marcados.</span>`}</div>
     ${ja.length ? `<div class="sum">Aguardando conferência: ${ja.join(", ")}</div>` : ""}
+    ${livres.length ? `<label class="f">Algum problema? (opcional)<input class="inp" id="dvi-obs" value="${esc(st.obs || "")}" placeholder="Ex.: o NB-060 caiu e a tela trincou"></label>` : ""}
     <button class="btn back block" data-act="devolvi-ok" ${st.sel.size ? "" : "disabled"}>Marcar ${st.sel.size || ""} como devolvido${st.sel.size === 1 ? "" : "s"}</button>`;
 }
 function mDevolver(st) {
@@ -1209,6 +1334,7 @@ function mDevolver(st) {
   if (st.only) list = list.filter(e => e.id === st.only);
   const vivos = new Set(list.flatMap(pendentes));
   for (const c of [...st.sel]) if (!vivos.has(c)) st.sel.delete(c);
+  for (const c of [...st.def]) if (!st.sel.has(c)) st.def.delete(c);
   const shown = list.filter(e => !q || norm(e.pessoaNome).replace(/\s/g, "").includes(q) || pendentes(e).some(c => norm(c).includes(q)));
   const n = st.sel.size;
   return `${head("Devolver")}
@@ -1217,7 +1343,13 @@ function mDevolver(st) {
         <div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0"><div class="t" style="font-weight:700">${esc(e.pessoaNome)}</div><div class="note">${TIPOS[e.tipo].nome} · ${esc(e.finalidade)} · retirou ${dayKey(new Date(e.retiradoEm)) === dayKey() ? "às" : "em " + fmtLong.format(new Date(e.retiradoEm)) + ","} ${hhmm(e.retiradoEm)}</div></div>
         <button class="mini" data-act="dv-todos" data-id="${e.id}">${all ? "Desmarcar" : "Marcar todos"}</button></div>
         <div class="codes" style="margin-top:8px;max-height:none">${pend.map(c => `<button class="code" data-act="dv-code" data-v="${c}" aria-pressed="${st.sel.has(c)}">${c}</button>`).join("")}</div></div>`; }).join("") || `<span class="note">Nada encontrado.</span>`}</div>
-    <div class="sum">${n ? `<b>${n} para devolver</b>: ${[...st.sel].sort().join(", ")}` : "Toque nos códigos que estão sendo devolvidos."}</div>
+    ${st.relato ? `<div class="sum" style="background:var(--stop-bg);color:var(--stop-ink)"><b>O professor avisou:</b> ${esc(st.relato)}</div>` : ""}
+    ${n ? (st.defAberto ? `<div class="imp"><b>Algum voltou com problema?</b>
+      <span class="note">Toque nos códigos com defeito. Eles entram como devolvidos e vão direto para manutenção.</span>
+      <div class="codes">${[...st.sel].sort().map(c => `<button class="code ${st.def.has(c) ? "manut" : ""}" data-act="dv-def" data-v="${c}" aria-pressed="${st.def.has(c)}">${c}</button>`).join("")}</div>
+      <label class="f">O que aconteceu<input class="inp" id="dv-motivo" value="${esc(st.defMotivo)}" placeholder="Ex.: tela trincada, não liga, sem carregador"></label></div>`
+      : `<button class="btn ghost block" data-act="dv-def-abrir">Algum voltou com problema?</button>`) : ""}
+    <div class="sum">${n ? `<b>${n} para devolver</b>: ${[...st.sel].sort().join(", ")}${st.def.size ? `<br><b style="color:var(--stop-ink)">${st.def.size} com defeito → manutenção</b>: ${[...st.def].sort().join(", ")}` : ""}` : "Toque nos códigos que estão sendo devolvidos."}</div>
     <button class="btn back block" data-act="dv-ok" ${n ? "" : "disabled"}>Confirmar devolução</button>`
     : `<div class="empty">Tudo devolvido. Nada pendente.</div>`}`;
 }
@@ -1297,12 +1429,12 @@ async function novaPessoa(nome, extra = {}) {
   return ok ? { id: ref.id, ...p } : null;
 }
 
-async function registrarDevolucao(codes, nota) {
+async function registrarDevolucao(codes, nota, defeitos = {}) {
   const groups = new Map(), uso = emUsoMap();
   for (const c of codes) { const e = uso.get(c); if (e) { if (!groups.has(e.id)) groups.set(e.id, { e, codes: [] }); groups.get(e.id).codes.push(c); } }
   const agora = Date.now();
   for (const { e, codes: cs } of groups.values()) {
-    const dev = {}; cs.forEach(c => dev[c] = { em: agora, por: opNome(), ...(nota ? { nota } : {}) });
+    const dev = {}; cs.forEach(c => dev[c] = { em: agora, por: opNome(), ...(nota ? { nota } : {}), ...(defeitos[c] ? { defeito: defeitos[c] } : {}), ...(agora > prazoDe(e) ? { atrasado: true } : {}) });
     const resta = pendentes(e).filter(c => !cs.includes(c));
     const patch = { devolvidos: dev };
     if (!resta.length) { patch.aberto = false; patch.devolvidoEm = agora; }
@@ -1313,7 +1445,7 @@ async function registrarDevolucao(codes, nota) {
 }
 
 const acts = {
-  tab(t) { ui.tab = t.dataset.v; store.set("tab", ui.tab); ui.armed = null; if (ui.tab === "recados") store.set("recadosVistos", Date.now()); if (ui.tab === "agenda") store.set("agendaVista", Date.now()); render(); window.scrollTo(0, 0); },
+  tab(t) { ui.tab = t.dataset.v; store.set("tab", ui.tab); ui.armed = null; if (ui.tab === "historico") garantirHist(); if (ui.tab === "recados") store.set("recadosVistos", Date.now()); if (ui.tab === "agenda") store.set("agendaVista", Date.now()); render(); window.scrollTo(0, 0); },
   wa() {},
   tipo(t) { ui.tipo = t.dataset.v; render(); },
   seg(t) { ui.seg = t.dataset.v; store.set("seg", ui.seg); render(); },
@@ -1346,9 +1478,12 @@ const acts = {
     const disp = new Set(disponiveis(st.tipo)), codes = [...st.sel].filter(c => disp.has(c)).sort();
     if (codes.length !== st.sel.size) { toast("Alguns equipamentos acabaram de ser retirados em outro aparelho. Confira a seleção."); return modal.draw(); }
     t.disabled = true;
-    const e = { aberto: true, tipo: st.tipo, codes, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, pessoaCargo: st.pessoa.cargo || "", finalidade: st.fin, turma: st.turma.trim(), obs: st.obs.trim(), retiradoEm: Date.now(), operador: opNome(), devolvidos: {}, devolvidoEm: null, ...(st.resId ? { reservaId: st.resId } : {}), responsavelEmail: responsavelDe(st) };
+    const e = { aberto: true, tipo: st.tipo, codes, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, pessoaCargo: st.pessoa.cargo || "", devolverAte: prazoDevolucao(st), finalidade: st.fin, turma: st.turma.trim(), obs: st.obs.trim(), retiradoEm: Date.now(), operador: opNome(), devolvidos: {}, devolvidoEm: null, ...(st.resId ? { reservaId: st.resId } : {}), responsavelEmail: responsavelDe(st) };
     const ok = await write(() => DB.collection("emprestimos").doc().set(e), `${codes.length} ${codes.length === 1 ? TIPOS[st.tipo].um + " retirado" : TIPOS[st.tipo].nome.toLowerCase() + " retirados"} por ${st.pessoa.nome.split(" ")[0]}`);
-    if (ok) { modal.close(); if (ui.tab !== "painel" && ui.tab !== "agenda") { ui.tab = "painel"; render(); } } else t.disabled = false;
+    if (ok) {
+      modal.close(); if (ui.tab !== "painel" && ui.tab !== "agenda") { ui.tab = "painel"; render(); }
+      if (st.resId) write(() => DB.doc("reservas/" + st.resId).update({ retirado: true, retiradoEm: Date.now() }));
+    } else t.disabled = false;
   },
 
   /* devolver */
@@ -1358,14 +1493,26 @@ const acts = {
   conferir(t) { const e = S.abertos.find(x => x.id === t.dataset.id); if (e) openDevolver(e.id, aConferir(e)); },
   async "devolvi-ok"(t) {
     const st = modal.state, e = S.abertos.find(x => x.id === st.id), codes = [...st.sel]; if (!e || !codes.length) return;
-    const marca = {}; codes.forEach(c => marca[c] = { em: Date.now(), por: (meuAcesso() || {}).nome || meuEmail() });
+    const obs = String(st.obs || "").trim().slice(0, 300);
+    const marca = {}; codes.forEach(c => marca[c] = { em: Date.now(), por: (meuAcesso() || {}).nome || meuEmail(), ...(obs ? { problema: obs } : {}) });
     t.disabled = true;
     if (await write(() => DB.doc("emprestimos/" + e.id).update({ aDevolver: marca }), "Marcado. A coordenação vai conferir a devolução.")) {
       modal.close();
-      avisarEmail({ tipo: "devolucao", pessoa: e.pessoaNome, itens: resumoCodes(codes, e.tipo), codigos: codes.join(", ") });
+      avisarEmail({ tipo: "devolucao", pessoa: e.pessoaNome, itens: resumoCodes(codes, e.tipo), codigos: codes.join(", "), problema: obs });
     } else t.disabled = false;
   },
-  async "dv-ok"(t) { const codes = [...modal.state.sel]; t.disabled = true; if (await registrarDevolucao(codes)) { toast(`${codes.length} ${codes.length === 1 ? "equipamento devolvido" : "equipamentos devolvidos"}`); modal.close(); } else t.disabled = false; },
+  "dv-def-abrir"() { modal.state.defAberto = true; modal.draw(); },
+  "dv-def"(t) { const s = modal.state.def, c = t.dataset.v; s.has(c) ? s.delete(c) : s.add(c); modal.draw(); },
+  async "dv-ok"(t) {
+    const st = modal.state, codes = [...st.sel], defs = [...st.def].filter(c => st.sel.has(c)), motivo = String(st.defMotivo || "").trim();
+    if (defs.length && !motivo) return toast("Conte o que aconteceu com os equipamentos com defeito.");
+    const mapa = {}; defs.forEach(c => mapa[c] = motivo);
+    t.disabled = true;
+    if (!(await registrarDevolucao(codes, null, mapa))) { t.disabled = false; return; }
+    const par = paradosMap(); let n = 0;
+    for (const c of defs) if (!par.has(c) && await write(() => DB.doc("parados/" + c).set({ tipo: c.slice(0, 2), estado: "manut", motivo: "Devolvido com problema: " + motivo, em: Date.now(), por: opNome() }))) n++;
+    toast(`${codes.length} ${codes.length === 1 ? "equipamento devolvido" : "equipamentos devolvidos"}${n ? `. ${n} foi para manutenção.` : ""}`, 5000); modal.close();
+  },
 
   /* agenda */
   agendar(t) { openAgendar(Number(t.dataset.i)); },
@@ -1391,7 +1538,11 @@ const acts = {
   async "recusar-res"(t) {
     const k = "nega:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null;
     const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return;
-    if (await recusarReservas([r], "recusado pela coordenação")) toast(`Agendamento de ${r.pessoaNome.split(" ")[0]} recusado. Os equipamentos voltam a ficar livres.`, 5000);
+    if (await recusarReservas([r], "recusado pela coordenação")) {
+      toast(`Agendamento de ${r.pessoaNome.split(" ")[0]} recusado. Os equipamentos voltam a ficar livres.`, 5000);
+      const a = cfg().horarios[r.seg] && cfg().horarios[r.seg][r.aula] || {};
+      if (r.criadoPorEmail && r.criadoPorEmail !== meuEmail()) avisarEmail({ tipo: "recusado", para: r.criadoPorEmail, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });
+    }
   },
   async "cancelar-res"(t) { const k = "res:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("reservas/" + t.dataset.id).delete(), "Agendamento cancelado"); },
   "retirar-res"(t) { const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return; openRetirar({ tipo: r.tipo, pessoa: pessoa(r.pessoaId) || { id: r.pessoaId, nome: r.pessoaNome }, fin: "Agendamento", turma: r.turma, qtd: r.qtd, itens: r.itens, resId: r.id }); },
@@ -1405,10 +1556,26 @@ const acts = {
   async "apagar-rec"(t) { const k = "rec:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("recados/" + t.dataset.id).delete(), "Recado apagado"); },
 
   /* histórico */
-  "mais-hist"() { ui.histLimit += 300; subscribeHist(); },
+  "hist-modo"(t) { ui.histModo = t.dataset.v; render(); },
+  "rel-imprimir"() {
+    const D = ui.rel.dados; if (!D) return; const agora = new Date();
+    let el = $("#print"); if (!el) { el = document.createElement("div"); el.id = "print"; document.body.appendChild(el); }
+    el.innerHTML = `<div class="lst-h"><img src="icons/cog-bulb.png" alt=""><div><h1>Relatório de uso · ${PERIODOS[ui.rel.dadosPer]}</h1><p>COG · Ensino Integral · ParqueTEC · impresso em ${esc(fmtLong.format(agora))}, ${hhmm(agora)}</p></div></div>${corpoRelatorio(D)}`;
+    window.print();
+  },
+  async "rel-csv"() {
+    const D = ui.rel.dados; if (!D) return;
+    const rows = [["Relatório de uso", PERIODOS[ui.rel.dadosPer]], [], ["Retiradas", D.retiradas], ["Equipamentos emprestados", D.equip], ["Pessoas atendidas", D.pessoas], ["Devoluções atrasadas", D.atrasos], ["Voltaram com defeito", D.defeitos], [],
+      ["Pessoa", "Equipamentos", "Retiradas"], ...D.porPessoa, [], ["Turma", "Equipamentos"], ...D.porTurma, [], ["Modelo", "Vezes emprestado"], ...D.porModelo, [], ["Dia da semana", "Equipamentos"], ...D.porDia, [], ["Finalidade", "Equipamentos"], ...D.porFin];
+    const csv = "\ufeff" + rows.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    try { await downloads.save({ filename: `relatorio-uso-${ui.rel.dadosPer}-${dayKey()}.csv`, data: csv }); toast("Relatório salvo"); } catch (e) { if (!e || e.code !== "declined") toast("Não deu para baixar aqui."); }
+  },
+  "mais-hist"() { ui.histLimit += 100; subscribeHist(); },
   async planilha() {
+    let lista = S.hist;
+    try { const q = await DB.collection("emprestimos").orderBy("retiradoEm", "desc").limit(2000).get(); lista = q.docs.map(d => ({ id: d.id, ...d.data() })); } catch {}
     const rows = [["Data", "Hora da retirada", "Tipo", "Equipamento", "Modelo", "Patrimônio", "Pessoa", "Cargo/turma da pessoa", "Turma/sala", "Finalidade", "Autorizado por", "Situação", "Devolvido em", "Recebido por", "Observação"]];
-    for (const e of S.hist.slice().reverse()) for (const c of e.codes || []) {
+    for (const e of lista.slice().reverse()) for (const c of e.codes || []) {
       const d = (e.devolvidos || {})[c], dt = new Date(e.retiradoEm);
       rows.push([fmtLong.format(dt), hhmm(e.retiradoEm), TIPOS[e.tipo] ? TIPOS[e.tipo].um : e.tipo, c, inv(c).modelo || "", inv(c).patrimonio || "", e.pessoaNome, e.pessoaCargo || "", e.turma || "", e.finalidade, e.operador || "", d ? "devolvido" : "em uso", d ? `${dayKey(new Date(d.em)).split("-").reverse().join("/")} ${hhmm(d.em)}` : "", d ? d.por || "" : "", [e.obs, d && d.nota].filter(Boolean).join(" · ")]);
     }
@@ -1560,9 +1727,10 @@ const acts = {
     if (!ps) { t.disabled = false; return; }
     if (await write(() => DB.doc("acessos/" + email).set({ nome: x.nome, papel, pessoaId: ps.id, criadoEm: Date.now(), criadoPor: meuEmail() }))) {
       await write(() => DB.doc("pedidos/" + email).delete(), `${x.nome.split(" ")[0]} aprovado(a). O app já abre para ela(e).`);
+      avisarEmail({ tipo: "aprovado", para: email, nome: x.nome, papel: PAPEIS[papel] });
     } else t.disabled = false;
   },
-  async recusar(t) { const k = "pd:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; t.textContent = "confirmar"; t.classList.add("warn"); return; } ui.armed = null; await write(() => DB.doc("pedidos/" + t.dataset.id).update({ status: "recusado" }), "Pedido recusado"); },
+  async recusar(t) { const k = "pd:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; t.textContent = "confirmar"; t.classList.add("warn"); return; } ui.armed = null; const x = S.pedidos.find(p => p.id === t.dataset.id); if (await write(() => DB.doc("pedidos/" + t.dataset.id).update({ status: "recusado" }), "Pedido recusado")) avisarEmail({ tipo: "acessoRecusado", para: t.dataset.id, nome: x ? x.nome : "" }); },
   "email-teste"() {
     avisarEmail({ tipo: "agendamento", pessoa: "Teste do ParqueTEC", data: fmtLong.format(new Date()), aula: "teste de configuração", itens: "nenhum equipamento (é só um teste)", obs: "Se este e-mail chegou, o aviso por e-mail está funcionando." });
     toast("Teste enviado. Confira a caixa de entrada (e o spam) em 1 minuto.", 6000);
@@ -1601,6 +1769,7 @@ const acts = {
     if (await write(() => DB.doc("acessos/" + email).set({ nome, papel, pessoaId: ps.id, criadoEm: Date.now(), criadoPor: meuEmail() }),
       novo ? `Acesso criado para ${nome.split(" ")[0]}. Passe o e-mail e a senha para a pessoa.` : `${nome.split(" ")[0]} já tinha login: ela entra com a senha que já usa, ou toca em “Esqueci a senha”.`)) {
       ["#ac-nome", "#ac-email", "#ac-senha"].forEach(id => { const el = $(id); if (el) el.value = ""; });
+      avisarEmail({ tipo: "aprovado", para: email, nome, papel: PAPEIS[papel], manual: true });
     }
     t.disabled = false;
   },
@@ -1625,6 +1794,7 @@ function readCfgForm() {
   const num = (id, d) => { const el = $(id); return el ? Math.max(0, Math.min(200, parseInt(el.value) || 0)) : d; };
   c.notebooks = num("#c-nb", c.notebooks); c.tablets = num("#c-tb", c.tablets);
   const wa = $("#c-wa"); if (wa) c.whatsapp = wa.value.replace(/\D/g, "");
+  const lim = $("#c-limite"); if (lim && /^\d\d:\d\d$/.test(lim.value)) c.limite = lim.value;
   for (const seg of Object.keys(SEGS)) c.horarios[seg] = (c.horarios[seg] || []).map((a, i) => {
     const g = (f) => { const el = $(`#h-${seg}-${i}-${f}`); return el ? el.value.trim() : a[f]; };
     return { nome: g("nome") || a.nome, ini: g("ini"), fim: g("fim") };
@@ -1649,7 +1819,7 @@ document.addEventListener("input", (ev) => {
   let mm;
   if (st && (mm = id.match(/^(rt|ag)-n-(\d+)$/))) { st.qtds[modelosDe(mm[1] === "rt" ? st.tipo : ui.tipo)[Number(mm[2])]] = t.value; if (mm[1] === "ag") modal.draw(); return; }
   if (id === "dv-q" && st) { st.q = t.value; return modal.draw(); }
-  if (st) { const map = { "rt-turma": "turma", "rt-obs": "obs", "rt-qtd": "qtd", "ag-qtd": "qtd", "ag-turma": "turma", "ag-obs": "obs", "pr-motivo": "motivo", "pr-modelo": "modelo", "pr-pat": "patrimonio", "pr-local": "local" }; if (map[id]) st[map[id]] = t.value; }
+  if (st) { const map = { "rt-turma": "turma", "rt-obs": "obs", "rt-qtd": "qtd", "ag-qtd": "qtd", "ag-turma": "turma", "ag-obs": "obs", "pr-motivo": "motivo", "pr-modelo": "modelo", "pr-pat": "patrimonio", "pr-local": "local", "dv-motivo": "defMotivo", "dvi-obs": "obs" }; if (map[id]) st[map[id]] = t.value; }
   if (id === "hist-q") { ui.histQ = t.value; render(); }
   if (id === "ger-q") { ui.gerQ = t.value; render(); }
 });
@@ -1658,6 +1828,7 @@ document.addEventListener("change", (ev) => {
   if (t.id === "rt-fin" && modal.state) modal.state.fin = t.value;
   if (t.id === "rt-modelo" && modal.state) { modal.state.modelo = t.value; modal.draw(); }
   if (t.id === "inv-file" && t.files && t.files[0]) lerArquivoInventario(t.files[0]);
+  if (t.id === "rel-per") { ui.rel.periodo = t.value; render(); }
   if (t.id === "agenda-date" && t.value) { ui.date = t.value; subscribeReservas(); render(); }
 });
 document.addEventListener("keydown", (ev) => {
@@ -1674,7 +1845,26 @@ function toast(msg, ms = 2800) {
 }
 
 /* ---------- Início ---------- */
-function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null, pedidoNoServidor: false, futurasOk: false, pedidosOk: false, abertosOk: false, resHojeOk: false }); ui.semAcesso = false; ui.importPrev = null; }
+async function vigiarAtrasos() {
+  if (!DB || !S.abertosOk) return;
+  const k = "atrasosAvisados:" + dayKey(), vistos = new Set(store.get(k, []));
+  for (const e of S.abertos) {
+    if (!atrasado(e)) continue;
+    const meu = e.responsavelEmail && e.responsavelEmail === meuEmail();
+    if ((isEquipe() || meu) && !vistos.has(e.id)) {
+      vistos.add(e.id); store.set(k, [...vistos]);
+      avisarAparelho(meu && !isEquipe() ? "Sua devolução está atrasada" : "Devolução atrasada", `${e.pessoaNome}: ${resumoCodes(pendentes(e), e.tipo)} devia voltar ${fmtPrazo(prazoDe(e))}.`);
+    }
+    // E-mail uma vez só por retirada, mandado pelo primeiro aparelho da equipe que perceber.
+    if (isEquipe() && CONF.avisoEmail && !e.atrasoAvisado && DB.umaVez && await DB.umaVez("emprestimos/" + e.id, "atrasoAvisado")) {
+      const dados = { pessoa: e.pessoaNome, itens: resumoCodes(pendentes(e), e.tipo), codigos: pendentes(e).join(", "), prazo: fmtPrazo(prazoDe(e)) };
+      avisarEmail({ tipo: "atraso", ...dados });
+      if (e.responsavelEmail) avisarEmail({ tipo: "atraso", para: e.responsavelEmail, ...dados });
+    }
+  }
+  scheduleRender();
+}
+function stopAll() { for (const k of Object.keys(unsub)) { unsub[k](); delete unsub[k]; } Object.assign(S, { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], meuAc: null, inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null, pedidoNoServidor: false, futurasOk: false, pedidosOk: false, abertosOk: false, resHojeOk: false }); ui.semAcesso = false; ui.importPrev = null; }
 async function boot() {
   const conf = HOSTED && window.PARQUETEC_FIREBASE;
   if (HOSTED) {
@@ -1709,6 +1899,7 @@ async function boot() {
     if (cloud) { DB = cloud; MODE = "claude"; } else { DB = localDB(); MODE = "local"; }
     subscribeAll();
   }
+  setInterval(vigiarAtrasos, 60000); setTimeout(vigiarAtrasos, 4000);
   setInterval(() => { const k = dayKey(); if (k !== boot.day) { if (Object.keys(unsub).length) { if (ui.date === boot.day) { ui.date = k; subscribeReservas(); } subscribeResHoje(); if (unsub.futuras) subscribeFuturas(); } boot.day = k; render(); } }, 60000);
   boot.day = dayKey();
 }

@@ -79,6 +79,18 @@ Também serve qualquer outra hospedagem de site estático (Netlify, Firebase Hos
 4. Em **Gerenciar → Acessos ao app**, dê acesso a quem vai usar: nome, e-mail, uma senha inicial e o perfil. Passe o e-mail e a senha para a pessoa.
 5. Em **Gerenciar → Cadastrar pessoa**, cadastre quem pega equipamento. Para cadastrar muitas, cole a lista (uma por linha, `Nome; cargo ou turma`).
 
+## Atrasos, defeitos e relatório
+
+- **Prazo de devolução**: com agendamento, é o fim da aula mais 30 minutos; sem agendamento, é o horário limite do dia (Gerenciar → Ajustes, padrão 18:00). Passou do prazo, a retirada aparece em vermelho em **Devoluções atrasadas**, a coordenação recebe aviso no app e por e-mail, e o professor também (uma vez por retirada).
+- **Devolução com defeito**: ao marcar "Devolvi", o professor pode contar o problema. Na conferência, a coordenação toca em **Algum voltou com problema?**, marca os códigos e escreve o que aconteceu: eles entram como devolvidos e vão direto para manutenção.
+- **Relatório de uso** (Histórico → Relatório de uso): por período (este mês, mês passado, últimos 30 dias, este ano), com retiradas, equipamentos, pessoas, atrasos, defeitos, quem mais usou, turmas, modelos, dias da semana e finalidade. Dá para imprimir e baixar a planilha.
+
+## E-mails que o app manda
+
+- Para a coordenação: pedido de acesso, novo agendamento de professor, devolução marcada pelo professor e devolução atrasada.
+- Para o professor: acesso liberado ou recusado, agendamento recusado e devolução atrasada.
+- Limites de segurança no script: no máximo 80 e-mails por dia e 6 para a mesma pessoa, sem links vindos de fora.
+
 ## Avisos para a coordenação
 
 - **No app**: números vermelhos nas abas (novos agendamentos, pedidos de acesso, devoluções para conferir) e avisos na tela. Para receber o aviso mesmo com o app minimizado, toque em **Gerenciar → Ajustes → Ativar avisos**.

@@ -18,7 +18,12 @@ service cloud.firestore {
 
       match /acessos/{e}  { allow read: if liberado(); allow write: if coordenacao(); }
       match /config/{d}   { allow read: if liberado(); allow write: if coordenacao(); }
-      match /parados/{d}  { allow read: if liberado(); allow write: if coordenacao(); }
+      // Manutenção e baixa: a coordenação decide; a equipe pode mandar para manutenção (devolução com defeito).
+      match /parados/{d}  {
+        allow read: if liberado();
+        allow write: if coordenacao();
+        allow create: if equipe() && request.resource.data.estado == "manut";
+      }
 
       // Pedidos de acesso: cada pessoa cria e vê o próprio; a coordenação aprova ou recusa.
       match /pedidos/{e} {
