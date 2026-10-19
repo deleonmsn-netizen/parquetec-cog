@@ -154,8 +154,9 @@ textarea.inp{min-height:84px;resize:vertical}
 .free small{font-size:11px}
 .free.zero{background:var(--danger-soft);color:var(--danger)}
 .res{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
-.res-i{display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:var(--r-sm);padding:8px 10px;font-size:13.5px}
-.res-i .grow{flex:1;min-width:0;overflow-wrap:anywhere}
+.res-i{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface-2);border-radius:var(--r-sm);padding:8px 10px;font-size:13.5px}
+.res-i .grow{flex:1 1 200px;min-width:0;overflow-wrap:break-word}
+.res-b{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
 
 /* Equipment grid */
 .codes{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;max-height:300px;overflow-y:auto;padding:2px}
@@ -441,6 +442,8 @@ const STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator
 const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null };
 const CONF = window.PARQUETEC_FIREBASE || {};
+// Versão do app e das regras do Firebase (firestore.rules, bloco "versao"). Troque juntas quando as regras mudarem.
+const VERSAO = "19", REGRAS = "regras-6";
 const meuEmail = () => String(AUTH && AUTH.email || "").toLowerCase();
 const souDono = () => !!(CONF.dono && meuEmail() === String(CONF.dono).toLowerCase());
 const meuAcesso = () => S.meuAc || S.acessos.find(a => a.id === meuEmail());
@@ -520,7 +523,7 @@ function subscribeAll() {
   if (MODE === "firebase") listen("meuAc", DB.doc("acessos/" + meuEmail()), s => { S.meuAc = s.exists ? { id: s.id, ...s.data() } : null; aposAcesso(); });
 }
 function aposAcesso() {
-  setTimeout(garantirIdsAulas);
+  setTimeout(garantirIdsAulas); setTimeout(conferirRegras);
   if (isEquipe() && !unsub.pessoas) subscribePessoas();
   if (isEquipe() && !unsub.futuras) subscribeFuturas();
   if (isEquipe() && !unsub.acessos) listen("acessos", DB.collection("acessos"), s => {
@@ -536,6 +539,16 @@ function aposAcesso() {
   if (MODE === "firebase" && operador && !String(operador.id).startsWith("login:")) operador = null;
   if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: PAPEIS[a.papel] || "" }; store.set(opKey(), operador); }
   else if (!operador && souDono()) { operador = { id: "login:" + meuEmail(), nome: "Coordenação", cargo: "" }; store.set(opKey(), operador); }
+}
+// A coordenação vê um aviso se as regras coladas no Firebase não são as desta versão do app.
+async function conferirRegras(forcar) {
+  if (MODE !== "firebase" || !isAdmin() || (ui.regras !== undefined && !forcar)) return;
+  ui.regras = "conferindo";
+  const ler = (id) => DB.doc("versao/" + id).get().then(() => true, e => e && e.code === "permission-denied" ? false : null);
+  const [atual, outra] = await Promise.all([ler(REGRAS), ler("teste")]);
+  ui.regras = atual === null || outra === null ? undefined : atual && !outra ? "ok" : "antigas";
+  render();
+  if (forcar) toast(ui.regras === "ok" ? "Regras do Firebase em dia." : ui.regras === "antigas" ? "As regras ainda são as antigas. Confira se clicou em Publicar." : "Sem internet para conferir agora.", 5000);
 }
 let idsAulasFeito = false;
 function garantirIdsAulas() {
@@ -577,9 +590,9 @@ function errMsg(e) {
     : code === "resource_exhausted" || code === "resource-exhausted" ? "Muitas ações seguidas. Espere alguns segundos e tente de novo."
     : "Não deu para salvar agora. Confira a internet e tente de novo.";
 }
-async function write(fn, okMsg, ms) {
+async function write(fn, okMsg, ms, semPermissao) {
   try { await fn(); if (okMsg) toast(okMsg, ms); return true; }
-  catch (e) { toast(errMsg(e), 5000); console.warn(e); return false; }
+  catch (e) { toast(semPermissao && e && e.code === "permission-denied" ? semPermissao : errMsg(e), semPermissao ? 9000 : 5000); console.warn(e); return false; }
 }
 
 /* ---------- Estado derivado ---------- */
@@ -620,12 +633,22 @@ const ativa = (r) => r.status !== "recusado";
 // Agendamentos antigos (sem aulaId) continuam achando a aula pela posição.
 const aulasDe = (seg) => cfg().horarios[seg] || [];
 function aulaDe(r) { const l = aulasDe(r.seg); return r.aulaId ? l.find(a => a.id === r.aulaId) : l[r.aula]; }
-function naAula(r, seg, idx) { const a = aulasDe(seg)[idx]; return r.seg === seg && (r.aulaId ? !!a && a.id === r.aulaId : r.aula === idx); }
 const posAula = (r) => { const l = aulasDe(r.seg), i = r.aulaId ? l.findIndex(a => a.id === r.aulaId) : r.aula; return i < 0 ? 99 : Number(i) || 0; };
+// Aula dobrada: o agendamento vai da aula de início até a aula "ate", com os mesmos equipamentos.
+const posFim = (r) => { const i0 = posAula(r); if (r.ateId) { const i = aulasDe(r.seg).findIndex(a => a.id === r.ateId); return i < 0 ? i0 : Math.max(i0, i); } return r.ate != null ? Math.max(i0, Number(r.ate) || 0) : i0; };
+function naAula(r, seg, idx) { if (r.seg !== seg) return false; const i0 = posAula(r); return i0 !== 99 && idx >= i0 && idx <= posFim(r); }
+// Nome e horário de todo o agendamento (uma aula ou aulas seguidas).
+function faixaDe(r) {
+  const l = aulasDe(r.seg), a = aulaDe(r); if (!a) return null;
+  const b = l[posFim(r)] || a;
+  return b === a ? { nome: a.nome, ini: a.ini, fim: a.fim, n: 1 } : { nome: nomeFaixa(a, b, posFim(r) - posAula(r) + 1), ini: a.ini, fim: b.fim, n: posFim(r) - posAula(r) + 1 };
+}
+const nomeFaixa = (a, b, n) => n === 2 ? `${a.nome} e ${b.nome}` : `${a.nome} até ${b.nome}`;
+const textoAula = (r) => { const f = faixaDe(r); return f ? `${f.nome} (${f.ini} às ${f.fim})${f.n > 1 ? " · aula dobrada" : ""}` : r.aulaNome || ""; };
 // Até quando a retirada deve voltar: fim da aula agendada (+30 min) ou o horário limite do dia.
 function prazoDevolucao(st) {
   const r = st.resId && [...S.reservas, ...S.resHoje].find(x => x.id === st.resId);
-  const a = r && aulaDe(r);
+  const a = r && faixaDe(r);
   if (a && /^\d\d:\d\d$/.test(a.fim || "")) { const [h, m] = a.fim.split(":").map(Number), d = keyToDate(r.data); d.setHours(h, m + 30, 0, 0); if (d.getTime() > Date.now() + 15 * 60000) return d.getTime(); }
   const [h, m] = String(cfg().limite || "18:00").split(":").map(Number), d = new Date();
   d.setHours(isNaN(h) ? 18 : h, isNaN(m) ? 0 : m, 0, 0);
@@ -680,6 +703,12 @@ function livresSlot(t, seg, idx) {
   }
   return { total, porModelo };
 }
+// Livres em aulas seguidas: o menor de cada aula (os mesmos equipamentos ficam nas duas).
+function livresFaixa(t, seg, i0, i1) {
+  let L = null;
+  for (let i = i0; i <= i1; i++) { const x = livresSlot(t, seg, i); if (!L) L = { total: x.total, porModelo: { ...x.porModelo } }; else { L.total = Math.min(L.total, x.total); for (const m in L.porModelo) L.porModelo[m] = Math.min(L.porModelo[m], x.porModelo[m]); } }
+  return L || livresSlot(t, seg, i0);
+}
 function modelosDe(t) { return [...new Set(codesFor(t).map(c => inv(c).modelo).filter(Boolean))]; }
 const opNome = () => operador ? operador.nome : "";
 
@@ -714,29 +743,32 @@ function renderTabs() {
 
 function render() {
   const a = document.activeElement, fid = a && a.id, sel = a && "selectionStart" in a ? [a.selectionStart, a.selectionEnd] : null;
+  // Guarda o que a pessoa digitou: atualizações de outros aparelhos (e do login) redesenham a tela.
+  const kept = ui.noKeep ? [] : [...document.querySelectorAll("#main input[id], #main textarea[id], #main select[id]")]
+    .filter(el => el.type === "checkbox" ? el.checked !== el.defaultChecked : el.tagName === "SELECT" ? [...el.options].some(o => o.selected !== o.defaultSelected) : el.value !== el.defaultValue)
+    .map(el => [el.id, el.type === "checkbox" ? el.checked : el.value]);
+  ui.noKeep = false;
+  const restaurar = () => {
+    for (const [id, v] of kept) { const el = document.getElementById(id); if (el) { if (el.type === "checkbox") el.checked = v; else el.value = v; } }
+    if (fid) { const el = document.getElementById(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} } }
+  };
   $("#who").textContent = operador ? `${operador.nome}${operador.cargo ? " · " + operador.cargo : ""}` : (MODE === "firebase" ? (AUTH && AUTH.email) || "" : "Toque em Trocar para dizer quem está usando");
   renderTabs();
   const precisaLogin = MODE === "firebase" && !AUTH;
   // Com login, "Sair" encerra a sessão para outra pessoa entrar com o próprio login.
   const tb = $(".top-btn"); tb.textContent = MODE === "firebase" ? "Sair" : "Trocar"; tb.dataset.act = MODE === "firebase" ? "sair" : "operador";
   $(".bar").hidden = precisaLogin; tb.hidden = precisaLogin || (MODE !== "firebase" && isProfessor()); $(".acts").hidden = isProfessor();
-  if (precisaLogin) { if (ui.authReady) { $("#who").textContent = "Entre para continuar"; $("#main").innerHTML = ui.primeiro ? vPrimeiro() : ui.cadastro ? vCadastro() : vLogin(); } return; }
+  if (precisaLogin) { if (ui.authReady) { $("#who").textContent = "Entre para continuar"; $("#main").innerHTML = ui.primeiro ? vPrimeiro() : ui.cadastro ? vCadastro() : vLogin(); restaurar(); } return; }
   if (MODE === "firebase" && (ui.verificar || ui.semAcesso)) {
     $(".bar").hidden = true; $("#who").textContent = AUTH.email || "";
-    $("#main").innerHTML = ui.verificar ? vVerificar() : vSemAcesso(); return;
+    $("#main").innerHTML = ui.verificar ? vVerificar() : vSemAcesso(); restaurar(); return;
   }
   if (!S.configLoaded) return;
   // Sem tablets (ou sem notebooks), fica no tipo que existe.
   for (const k of ["tipo", "gerTipo"]) if (!temTipo(ui[k]) && temTipo(ui[k] === "NB" ? "TB" : "NB")) ui[k] = ui[k] === "NB" ? "TB" : "NB";
   const views = { painel: vPainel, agenda: vAgenda, recados: vRecados, historico: vHistorico, gerenciar: vGerenciar };
-  // Guarda o que a pessoa digitou: atualizações de outros aparelhos redesenham a tela.
-  const kept = ui.noKeep ? [] : [...document.querySelectorAll("#main input[id], #main textarea[id], #main select[id]")]
-    .filter(el => el.type === "checkbox" ? el.checked !== el.defaultChecked : el.tagName === "SELECT" ? [...el.options].some(o => o.selected !== o.defaultSelected) : el.value !== el.defaultValue)
-    .map(el => [el.id, el.type === "checkbox" ? el.checked : el.value]);
-  ui.noKeep = false;
   $("#main").innerHTML = (MODE === "local" ? `<div class="mode">Modo de teste: os dados ficam só neste aparelho${HOSTED ? ". Para juntar celular e computador, siga o passo do Firebase no LEIA-ME." : ". Abra pelo link do claude.ai para salvar na nuvem."}</div>` : "") + `<div class="stack" style="margin-top:${MODE === "local" ? 14 : 0}px">${(views[ui.tab] || vPainel)()}</div>`;
-  for (const [id, v] of kept) { const el = document.getElementById(id); if (el) { if (el.type === "checkbox") el.checked = v; else el.value = v; } }
-  if (fid) { const el = document.getElementById(fid); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); if (sel && el.setSelectionRange) try { el.setSelectionRange(sel[0], sel[1]); } catch {} } }
+  restaurar();
   if (modal.render) modal.refresh();
 }
 
@@ -838,9 +870,9 @@ function agendadosHoje(t) {
     if (isEquipe()) return `<div style="display:flex;gap:6px;align-items:center"><span class="badge">aprovado</span>${nega(r)}<button class="mini" data-act="retirar-res" data-id="${r.id}" title="Registrar a retirada pelo professor">Retirar</button></div>`;
     return `<span class="badge">aprovado</span>`;
   };
-  const rows = lista.map(r => { const a = aulaDe(r) || {};
+  const rows = lista.map(r => { const a = faixaDe(r) || {};
     const al = isEquipe() && ativa(r) ? alertaRes(r) : "";
-    return `<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:180px"><div class="t">${esc(r.pessoaNome)}${al ? ` <span class="badge late">${al}</span>` : ""}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) && r.motivo && r.motivo !== "recusado pela coordenação" ? ` · ${esc(r.motivo)}` : ""}${ativa(r) && r.aprovado && r.aprovadoPor && !feitoRes(r) ? ` · aprovado por ${esc(r.aprovadoPor)}` : ""}</div></div>
+    return `<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:180px"><div class="t">${esc(r.pessoaNome)}${al ? ` <span class="badge late">${al}</span>` : ""}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""}${a.n > 1 ? ` · <b>aula dobrada</b>` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) && r.motivo && r.motivo !== "recusado pela coordenação" ? ` · ${esc(r.motivo)}` : ""}${ativa(r) && r.aprovado && r.aprovadoPor && !feitoRes(r) ? ` · aprovado por ${esc(r.aprovadoPor)}` : ""}</div></div>
       ${acao(r)}</div>`; }).join("");
   const nPend = isEquipe() ? lista.filter(pendente).length : 0;
   return `<section class="card"><div class="sec-h"><h2>Agendados para hoje</h2><span class="note">${nPend ? `<b style="color:var(--danger)">${nPend} para aprovar</b> · ` : ""}${lista.length}</span></div>
@@ -884,7 +916,10 @@ function vPainel() {
   const confs = isEquipe() ? S.abertos.filter(e => aConferir(e).length) : [];
   const conferir = confs.length ? `<section class="card" style="border-color:var(--stop-ink)"><div class="sec-h"><h2>Devoluções para conferir</h2><span class="note">${confs.length}</span></div>
     <div class="list">${confs.map(e => { const c = aConferir(e), x = e.aDevolver[c[0]] || {}; return `<div class="row"><div class="grow"><div class="t">${esc(e.pessoaNome)}</div><div class="s">Marcou ${esc(resumoCodes(c, e.tipo))} como devolvido${x.em ? ` às ${hhmm(x.em)}` : ""} · ${c.join(", ")}${x.problema ? `<br><b style="color:var(--stop-ink)">Problema: ${esc(x.problema)}</b>` : ""}</div></div><button class="btn back sm" data-act="conferir" data-id="${e.id}">Conferir</button></div>`; }).join("")}</div></section>` : "";
-  return `${quem}${atrasos}${conferir}${installCard()}${tipoSeg("", ui.tipo, "tipo")}
+  const regras = ui.regras === "antigas" ? `<section class="card stack" style="border-color:var(--danger)"><h2 style="color:var(--danger);font-size:17px">Atualize as regras do Firebase</h2>
+    <p class="note" style="margin:0">As regras de segurança coladas no Firebase são de uma versão antiga do app. Enquanto isso, os professores não conseguem tocar em Retirar. Abra <b>console.firebase.google.com → Firestore Database → Regras</b>, apague tudo, cole o arquivo <b>firestore.rules</b> mais novo e clique em <b>Publicar</b>.</p>
+    <button class="btn sm" data-act="regras-conferir" style="align-self:flex-start">Já publiquei, conferir de novo</button></section>` : "";
+  return `${regras}${quem}${atrasos}${conferir}${installCard()}${tipoSeg("", ui.tipo, "tipo")}
     <div class="tiles">
       <div class="tile t-ok"><span class="lbl">Disponíveis</span><span class="num">${st.disp}</span></div>
       <div class="tile t-use"><span class="lbl">Em uso${(() => { const n = S.abertos.filter(e => e.tipo === ui.tipo && atrasado(e)).length; return n ? ` · <b style="color:var(--danger)">${n} atrasad${n === 1 ? "o" : "os"}</b>` : ""; })()}</span><span class="num">${st.emUso}</span></div>
@@ -910,11 +945,11 @@ function vAgenda() {
       <div><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.ini)} às ${esc(a.fim)}</div></div>
       <div class="free ${livres ? "" : "zero"}"><b>${livres}</b><small>livres</small></div>
       <button class="btn go sm" data-act="agendar" data-i="${i}" ${livres && !passado ? "" : "disabled"} ${passado ? 'title="Esse dia já passou"' : ""}>Agendar</button>
-      ${res.length ? `<div class="res">${res.map(r => { const al = isEquipe() && ativa(r) ? alertaRes(r) : ""; return `<div class="res-i" style="${ativa(r) ? "" : "opacity:.6"}"><div class="grow"><b>${esc(r.pessoaNome)}</b>${al ? ` <span class="badge late">${al}</span>` : ""} · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) ? ` · <b style="color:var(--danger)">recusado</b>${r.motivo && r.motivo !== "recusado pela coordenação" ? " (" + esc(r.motivo) + ")" : ""}` : feitoRes(r) ? ` · <b>retirado</b>` : pendente(r) ? ` · <b style="color:var(--stop-ink)">aguardando aprovação</b>` : ` · aprovado`}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div>
+      ${res.length ? `<div class="res">${res.map(r => { const al = isEquipe() && ativa(r) ? alertaRes(r) : ""; return `<div class="res-i" style="${ativa(r) ? "" : "opacity:.6"}"><div class="grow"><b>${esc(r.pessoaNome)}</b>${al ? ` <span class="badge late">${al}</span>` : ""} · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}${posFim(r) > posAula(r) ? ` · <b>aula dobrada</b> (${esc((faixaDe(r) || {}).nome || "")})` : ""}${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) ? ` · <b style="color:var(--danger)">recusado</b>${r.motivo && r.motivo !== "recusado pela coordenação" ? " (" + esc(r.motivo) + ")" : ""}` : feitoRes(r) ? ` · <b>retirado</b>` : pendente(r) ? ` · <b style="color:var(--stop-ink)">aguardando aprovação</b>` : ` · aprovado`}${r.obs ? `<div class="note">${esc(r.obs)}</div>` : ""}</div><div class="res-b">
         ${isEquipe() && pendente(r) && !passado ? `<button class="mini go" data-act="aprovar-res" data-id="${r.id}">Aprovar</button>` : ""}
         ${podeRetirar(r) ? `<button class="mini" data-act="retirar-res" data-id="${r.id}">Retirar</button>` : ""}
         ${isEquipe() && ativa(r) && !passado ? `<button class="mini ${ui.armed === "nega:" + r.id ? "warn" : ""}" data-act="recusar-res" data-id="${r.id}">${ui.armed === "nega:" + r.id ? "Confirmar" : "Recusar"}</button>` : ""}
-        ${isEquipe() || r.criadoPorEmail === meuEmail() ? `<button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : ativa(r) ? "Cancelar" : "Apagar"}</button>` : ""}</div>`; }).join("")}</div>` : ""}
+        ${isEquipe() || r.criadoPorEmail === meuEmail() ? `<button class="mini ${ui.armed === "res:" + r.id ? "warn" : ""}" data-act="cancelar-res" data-id="${r.id}">${ui.armed === "res:" + r.id ? "Confirmar" : ativa(r) ? "Cancelar" : "Apagar"}</button>` : ""}</div></div>`; }).join("")}</div>` : ""}
     </div>`;
   }).join("");
   return `<div class="card datebar">
@@ -1080,6 +1115,7 @@ function vGerenciar() {
       </ol>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="inp" id="app-url" readonly value="${esc(location.href.split("#")[0])}" style="flex:1;min-width:200px"><button class="btn ghost sm" data-act="copiar-url">Copiar endereço</button></div>
       ${installEvt ? `<button class="btn block" data-act="instalar">Instalar neste aparelho</button>` : ""}
+      <p class="note" style="margin:0">Versão do app: ${VERSAO}</p>
     </section>` : ""}`;
   const conta = `${MODE === "firebase" && AUTH ? `<section class="card" style="display:flex;align-items:center;gap:10px"><div class="grow" style="flex:1;min-width:0"><div class="note">Conectado como${adm ? " · coordenação" : ""}</div><b style="overflow-wrap:anywhere">${esc(AUTH.email || "")}</b></div><button class="mini" data-act="mudar-senha">Mudar senha</button><button class="btn ghost sm" data-act="sair">Sair</button></section>` : ""}`;
   const permAvisos = "Notification" in window ? Notification.permission : "indisponivel";
@@ -1259,7 +1295,7 @@ function vAcessos() {
 /* ---------- Janelas (retirar, devolver, agendar, operador, parar) ---------- */
 const modal = { render: null, state: null,
   open(fn, state) { this.render = fn; this.state = state; this.draw(true); },
-  close() { this.render = null; this.state = null; $("#modal").innerHTML = ""; document.body.style.overflow = ""; },
+  close() { this.render = null; this.state = null; $("#modal").innerHTML = ""; document.body.style.overflow = ""; if (ui.novaVersao) location.reload(); },
   draw(first) {
     if (!this.render) return;
     const a = document.activeElement, fid = a && a.id, sel = a && "selectionStart" in a ? [a.selectionStart, a.selectionEnd] : null;
@@ -1409,17 +1445,21 @@ function qtdRow(id, modelo, livres, rotulo, valor) {
   return `<div class="row"><div class="grow"><div class="t">${esc(modelo)}</div><div class="s">${livres} ${livres === 1 ? rotulo.replace("livres", "livre").replace("disponíveis", "disponível") : rotulo}</div></div>
     <input class="inp" id="${id}" type="number" min="0" max="${livres}" inputmode="numeric" placeholder="0" value="${esc(valor || "")}" style="width:84px;text-align:center" ${livres ? "" : "disabled"} aria-label="Quantidade de ${esc(modelo)}"></div>`;
 }
-function openAgendar(i) { modal.open(mAgendar, { live: true, aula: i, pessoa: isProfessor() ? minhaPessoa() : null, fixo: isProfessor(), q: "", qtd: "", qtds: {}, turma: "", obs: "" }); }
+function openAgendar(i) { modal.open(mAgendar, { live: true, aula: i, ate: i, pessoa: isProfessor() ? minhaPessoa() : null, fixo: isProfessor(), q: "", qtd: "", qtds: {}, turma: "", obs: "" }); }
 function mAgendar(st) {
-  const a = (cfg().horarios[ui.seg] || [])[st.aula]; if (!a) return head("Agendar");
-  const L = livresSlot(ui.tipo, ui.seg, st.aula), livres = L.total, ms = modelosDe(ui.tipo);
+  const aulas = cfg().horarios[ui.seg] || [], a = aulas[st.aula]; if (!a) return head("Agendar");
+  if (!(st.ate >= st.aula && st.ate < aulas.length)) st.ate = st.aula;
+  const b = aulas[st.ate], n = st.ate - st.aula + 1, ond = n > 1 ? "nessas aulas" : "nessa aula";
+  const L = livresFaixa(ui.tipo, ui.seg, st.aula, st.ate), livres = L.total, ms = modelosDe(ui.tipo);
   return `${head("Agendar")}
-    <div class="sum"><b>${TIPOS[ui.tipo].nome}</b> · ${SEGS[ui.seg]} · ${esc(a.nome)} (${esc(a.ini)} às ${esc(a.fim)})<br>${esc(fmtLong.format(keyToDate(ui.date)))} · ${livres} livres</div>
+    <div class="sum"><b>${TIPOS[ui.tipo].nome}</b> · ${SEGS[ui.seg]} · ${esc(n > 1 ? nomeFaixa(a, b, n) : a.nome)} (${esc(a.ini)} às ${esc(b.fim)})<br>${esc(fmtLong.format(keyToDate(ui.date)))} · ${livres} livres</div>
+    ${aulas.length > st.aula + 1 ? `<label class="f">Quantas aulas<select class="inp" id="ag-ate">${aulas.slice(st.aula).map((x, k) => `<option value="${st.aula + k}" ${st.ate === st.aula + k ? "selected" : ""}>${k === 0 ? `Só a ${esc(a.nome)}` : `${esc(nomeFaixa(a, x, k + 1))}${k === 1 ? " (aula dobrada)" : ` (${k + 1} aulas)`}`}</option>`).join("")}</select></label>
+    ${n > 1 ? `<p class="note" style="margin:-4px 0 0">Os mesmos equipamentos ficam reservados ${n === 2 ? "nas duas aulas" : `nas ${n} aulas`}. É uma retirada só, e a devolução é depois da ${esc(b.nome)}.</p>` : ""}` : ""}
     <div class="step">Para quem</div>
     ${st.fixo ? `<div class="chosen"><div class="grow">${esc(st.pessoa.nome)}</div></div>` : personPicker(st, "ag-q", { soProf: true })}
     ${ms.length ? `<div class="step">Quantos de cada modelo</div>
-    <div class="list">${ms.map((m, i) => qtdRow("ag-n-" + i, m, L.porModelo[m], "livres nessa aula", st.qtds[m])).join("")}</div>
-    <div class="sum">Total: <b>${somaQ(st.qtds)}</b> de ${livres} livres nessa aula</div>
+    <div class="list">${ms.map((m, i) => qtdRow("ag-n-" + i, m, L.porModelo[m], "livres " + ond, st.qtds[m])).join("")}</div>
+    <div class="sum">Total: <b>${somaQ(st.qtds)}</b> de ${livres} livres ${ond}</div>
     <label class="f">Turma<input class="inp" id="ag-turma" value="${esc(st.turma)}" placeholder="Ex.: 3º B"></label>`
     : `<div class="grid2">
       <label class="f">Quantidade<input class="inp" id="ag-qtd" type="number" min="1" max="${livres}" inputmode="numeric" value="${esc(st.qtd)}" placeholder="até ${livres}"></label>
@@ -1509,6 +1549,8 @@ const acts = {
   },
   "ir-ajustes"() { ui.tab = "gerenciar"; ui.gerAba = "ajustes"; store.set("tab", ui.tab); render(); window.scrollTo(0, 0); },
   imprimir() { modal.open(mImprimir, {}); },
+  "regras-conferir"() { conferirRegras(true); },
+  recarregar() { location.reload(); },
   retirar() { if (!S.config) return toast("Primeiro diga quantos equipamentos a escola tem."); if (!operador && MODE !== "firebase") toast("Dica: toque em Trocar, no topo, para registrar quem está autorizando."); openRetirar(); },
   devolver(t) { openDevolver(t.dataset.id); },
   fechar() { modal.close(); },
@@ -1543,7 +1585,8 @@ const acts = {
     t.disabled = true;
     const e = { aberto: true, tipo: st.tipo, codes, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, pessoaCargo: st.pessoa.cargo || "", devolverAte: prazoDevolucao(st), finalidade: st.fin, turma: st.turma.trim(), obs: st.obs.trim(), retiradoEm: Date.now(), operador: st.fixo ? st.aprovadoPor : opNome(), ...(st.fixo ? { retiradoPeloProfessor: true } : {}), devolvidos: {}, devolvidoEm: null, ...(st.resId ? { reservaId: st.resId } : {}), responsavelEmail: responsavelDe(st) };
     // Retirada do próprio professor tem código fixo: o mesmo agendamento não vira duas retiradas.
-    const ok = await write(() => (st.fixo ? DB.doc("emprestimos/r-" + st.resId) : DB.collection("emprestimos").doc()).set(e), `${codes.length} ${codes.length === 1 ? TIPOS[st.tipo].um + " retirado" : TIPOS[st.tipo].nome.toLowerCase() + " retirados"} por ${st.pessoa.nome.split(" ")[0]}`);
+    const ok = await write(() => (st.fixo ? DB.doc("emprestimos/r-" + st.resId) : DB.collection("emprestimos").doc()).set(e), `${codes.length} ${codes.length === 1 ? TIPOS[st.tipo].um + " retirado" : TIPOS[st.tipo].nome.toLowerCase() + " retirados"} por ${st.pessoa.nome.split(" ")[0]}`, undefined,
+      st.fixo ? "O Firebase não aceitou a retirada. Avise a coordenação: ao abrir o app, ela vê o que precisa atualizar. Enquanto isso, a coordenação pode registrar a retirada por você." : "");
     if (ok) {
       modal.close(); if (ui.tab !== "painel" && ui.tab !== "agenda") { ui.tab = "painel"; render(); }
       if (st.resId) write(() => DB.doc("reservas/" + st.resId).update({ retirado: true, retiradoEm: Date.now() }));
@@ -1581,23 +1624,24 @@ const acts = {
   /* agenda */
   agendar(t) { openAgendar(Number(t.dataset.i)); },
   async "ag-ok"(t) {
-    const st = modal.state, ms = modelosDe(ui.tipo), L = livresSlot(ui.tipo, ui.seg, st.aula), livres = L.total;
+    const st = modal.state, ms = modelosDe(ui.tipo), ate = st.ate > st.aula ? st.ate : st.aula, L = livresFaixa(ui.tipo, ui.seg, st.aula, ate), livres = L.total, ond = ate > st.aula ? "nessas aulas" : "nessa aula";
     let itens = null, qtd = parseInt(st.qtd) || 0;
     if (!st.pessoa) return toast("Escolha para quem é o agendamento.");
     if (ui.date < dayKey()) return toast("Esse dia já passou. Escolha hoje ou um dia à frente.");
     if (ms.length) {
       itens = {};
-      for (const m of ms) { const n = parseInt(st.qtds[m]) || 0; if (n > L.porModelo[m]) return toast(`Só há ${L.porModelo[m]} ${m} livres nessa aula.`); if (n > 0) itens[m] = n; }
+      for (const m of ms) { const n = parseInt(st.qtds[m]) || 0; if (n > L.porModelo[m]) return toast(`Só há ${L.porModelo[m]} ${m} livres ${ond}.`); if (n > 0) itens[m] = n; }
       qtd = somaQ(itens);
     }
     if (qtd < 1) return toast(ms.length ? "Digite quantos de cada modelo." : "Digite a quantidade.");
-    if (qtd > livres) return toast(`Só há ${livres} livres nesse horário.`);
+    if (qtd > livres) return toast(`Só há ${livres} livres ${ond}.`);
     t.disabled = true;
-    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, ...(aulasDe(ui.seg)[st.aula].id ? { aulaId: aulasDe(ui.seg)[st.aula].id } : {}), aulaNome: aulasDe(ui.seg)[st.aula].nome, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, ...(itens ? { itens } : {}), turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() || (meuAcesso() || {}).nome || meuEmail(), criadoPorEmail: meuEmail(),
+    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, ...(aulasDe(ui.seg)[st.aula].id ? { aulaId: aulasDe(ui.seg)[st.aula].id } : {}), aulaNome: ate > st.aula ? nomeFaixa(aulasDe(ui.seg)[st.aula], aulasDe(ui.seg)[ate], ate - st.aula + 1) : aulasDe(ui.seg)[st.aula].nome,
+      ...(ate > st.aula ? { ate, ...(aulasDe(ui.seg)[ate].id ? { ateId: aulasDe(ui.seg)[ate].id } : {}) } : {}), pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, ...(itens ? { itens } : {}), turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() || (meuAcesso() || {}).nome || meuEmail(), criadoPorEmail: meuEmail(),
       ...(isEquipe() ? { aprovado: true, aprovadoEm: Date.now(), aprovadoPor: opNome() || meuEmail(), paraEmail: loginDaPessoa(st.pessoa.id) } : { aprovado: false, paraEmail: meuEmail() }) };
     if (await write(() => DB.collection("reservas").doc().set(r), isEquipe() ? "Agendado e aprovado" : "Agendado. Agora é só esperar a coordenação aprovar.", isEquipe() ? 2600 : 5000)) {
       modal.close();
-      if (!isAdmin()) { const a = aulaDe(r) || {}; avisarEmail({ tipo: "agendamento", pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || ""} (${a.ini || ""} às ${a.fim || ""}) · ${SEGS[r.seg]}`, itens: resumoItens(r.itens, r.qtd, r.tipo), turma: r.turma, obs: r.obs, por: r.criadoPor }); }
+      if (!isAdmin()) avisarEmail({ tipo: "agendamento", pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${textoAula(r)} · ${SEGS[r.seg]}`, itens: resumoItens(r.itens, r.qtd, r.tipo), turma: r.turma, obs: r.obs, por: r.criadoPor });
     } else t.disabled = false;
   },
   async "recusar-res"(t) {
@@ -1605,9 +1649,8 @@ const acts = {
     const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return;
     if (await recusarReservas([r], "recusado pela coordenação")) {
       toast(`Agendamento de ${r.pessoaNome.split(" ")[0]} recusado. Os equipamentos voltam a ficar livres.`, 5000);
-      const a = aulaDe(r) || {};
       const para = destinoRes(r) || loginDaPessoa(r.pessoaId);
-      if (para && para !== meuEmail()) avisarEmail({ tipo: "recusado", para, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });
+      if (para && para !== meuEmail()) avisarEmail({ tipo: "recusado", para, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: textoAula(r), itens: resumoItens(r.itens, r.qtd, r.tipo) });
     }
   },
   async "cancelar-res"(t) { const k = "res:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("reservas/" + t.dataset.id).delete(), "Agendamento cancelado"); },
@@ -1622,8 +1665,7 @@ const acts = {
     const por = opNome() || meuEmail();
     const para = destinoRes(r) || loginDaPessoa(r.pessoaId);
     if (await write(() => DB.doc("reservas/" + r.id).update({ aprovado: true, aprovadoEm: Date.now(), aprovadoPor: por }), `Agendamento de ${r.pessoaNome.split(" ")[0]} aprovado. Na hora, ${para && para !== meuEmail() ? "o professor toca em Retirar" : "toque em Retirar"}.`, 4000)) {
-      const a = aulaDe(r) || {};
-      if (para && para !== meuEmail()) avisarEmail({ tipo: "agendamentoAprovado", para, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });
+      if (para && para !== meuEmail()) avisarEmail({ tipo: "agendamentoAprovado", para, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: textoAula(r), itens: resumoItens(r.itens, r.qtd, r.tipo) });
     } else t.disabled = false;
   },
 
@@ -1912,6 +1954,7 @@ document.addEventListener("input", (ev) => {
 document.addEventListener("change", (ev) => {
   const t = ev.target;
   if (t.id === "rt-fin" && modal.state) modal.state.fin = t.value;
+  if (t.id === "ag-ate" && modal.state) { modal.state.ate = Number(t.value); modal.draw(); }
   if (t.id === "rt-modelo" && modal.state) { modal.state.modelo = t.value; modal.draw(); }
   if (t.id === "inv-file" && t.files && t.files[0]) lerArquivoInventario(t.files[0]);
   if (t.id === "rel-per") { ui.rel.periodo = t.value; render(); }
@@ -1958,7 +2001,16 @@ async function boot() {
     downloads = { save: async ({ filename, data }) => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], { type: "text/csv;charset=utf-8" })); a.download = filename; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); } };
     window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; scheduleRender(); });
     window.addEventListener("appinstalled", () => { installEvt = null; toast("App instalado! Procure o ícone do ParqueTEC."); scheduleRender(); });
-    if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(() => {});
+    if ("serviceWorker" in navigator && location.protocol !== "file:") {
+      // Versão nova publicada: o app se atualiza sozinho (sem atrapalhar quem está no meio de uma ação).
+      const tinha = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener("controllerchange", () => { if (!tinha || ui.novaVersao) return; ui.novaVersao = true; if (!modal.state) location.reload(); else render(); });
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => {
+        const conferir = () => reg.update().catch(() => {});
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") conferir(); });
+        setInterval(conferir, 20 * 60000);
+      }).catch(() => {});
+    }
   }
   if (conf && conf.apiKey) {
     try { FB = await firebaseDB(conf); }

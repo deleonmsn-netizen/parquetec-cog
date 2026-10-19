@@ -47,6 +47,10 @@ Os perfis de acesso são três:
 
 Quando a coordenação ou o operador agenda para alguém, o agendamento já nasce aprovado.
 
+### Aula dobrada
+
+Ao agendar, escolha em **Quantas aulas** a opção "2ª aula e 3ª aula (aula dobrada)" (ou mais aulas seguidas). Funciona para o professor e para a coordenação. Os mesmos equipamentos ficam reservados em todas as aulas escolhidas, é uma retirada só, e o prazo de devolução é o fim da última aula mais 30 minutos.
+
 ### Trocar de pessoa no mesmo aparelho
 
 Cada pessoa usa o próprio login. Para outra pessoa usar o mesmo celular ou computador, toque em **Sair**, no topo, e entre com o outro e-mail e senha. O nome de quem está logado é o que aparece como "aprovado por" e "autorizado por".
@@ -141,4 +145,6 @@ O próprio app mostra um botão **Instalar** no Painel quando o aparelho permite
 | `icons/cog-lampada.svg` | Só a lâmpada, em vetor |
 | `firestore.rules` | Regras de segurança para colar no Firebase |
 
-Ao mudar o `index.html` depois de publicado, troque o número em `CACHE = "parquetec-v…"` dentro do `sw.js` para os aparelhos pegarem a versão nova.
+Ao mudar o `index.html` depois de publicado, troque o número em `CACHE = "parquetec-v…"` dentro do `sw.js` e o `VERSAO` no `index.html`. Os aparelhos se atualizam sozinhos: na hora, se o app estiver parado, ou assim que a pessoa fechar a janela em que está mexendo. A versão aparece em Gerenciar, no fim da página.
+
+Ao mudar o `firestore.rules`, troque também o nome no bloco `versao` (ex.: `regras-6`) e o `REGRAS` no `index.html`. Assim, se a coordenação esquecer de colar as regras novas no Firebase, o app mostra um aviso vermelho no Painel dela.

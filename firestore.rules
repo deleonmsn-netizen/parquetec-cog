@@ -74,10 +74,13 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["aDevolver"]);
       }
 
+      // Versão destas regras: o app avisa a coordenação quando o Firebase está com regras antigas.
+      match /versao/{v} { allow read: if liberado() && v == "regras-6"; }
+
       // Retiradas, devoluções e pessoas: todos leem, só a equipe grava.
       match /{colecao}/{doc} {
-        allow read: if liberado() && !(colecao in ["acessos", "config", "parados", "pedidos"]);
-        allow write: if equipe() && !(colecao in ["acessos", "config", "parados", "pedidos", "reservas", "recados"]);
+        allow read: if liberado() && !(colecao in ["acessos", "config", "parados", "pedidos", "versao"]);
+        allow write: if equipe() && !(colecao in ["acessos", "config", "parados", "pedidos", "reservas", "recados", "versao"]);
       }
     }
   }

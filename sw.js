@@ -1,6 +1,6 @@
 // Guarda o app no aparelho para abrir rápido e funcionar com internet fraca.
 // Ao publicar uma versão nova, troque o número abaixo.
-const CACHE = "parquetec-v18";
+const CACHE = "parquetec-v19";
 const SHELL = ["./", "./index.html", "./config.js", "./inventario-cog.js", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/cog-bulb.png", "./icons/cog-logo.webp"];
 
 self.addEventListener("install", (e) => {
@@ -18,7 +18,7 @@ self.addEventListener("fetch", (e) => {
   const put = (res) => { if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); } return res; };
   // Arquivos do próprio app: tenta a internet primeiro (pega atualizações), usa a cópia se estiver sem rede.
   if (url.origin === location.origin) {
-    e.respondWith(fetch(req).then(put).catch(() => caches.match(req).then((m) => m || caches.match("./index.html"))));
+    e.respondWith(fetch(req, { cache: "no-cache" }).then(put).catch(() => caches.match(req).then((m) => m || caches.match("./index.html"))));
     return;
   }
   // Fontes e biblioteca do Firebase não mudam: usa a cópia guardada.
