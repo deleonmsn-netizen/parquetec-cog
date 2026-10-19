@@ -478,8 +478,8 @@ function defaultConfig() {
   return {
     escola: "", notebooks: 0, tablets: 0, whatsapp: "", pinHash: "", limite: "18:00",
     horarios: {
-      medio: [["1ª aula", "07:00", "07:50"], ["2ª aula", "07:50", "08:40"], ["3ª aula", "08:40", "09:30"], ["4ª aula", "09:50", "10:40"], ["5ª aula", "10:40", "11:30"], ["6ª aula", "11:30", "12:20"]].map(([nome, ini, fim]) => ({ nome, ini, fim })),
-      fund: [["1ª aula", "13:00", "13:50"], ["2ª aula", "13:50", "14:40"], ["3ª aula", "14:40", "15:30"], ["4ª aula", "15:50", "16:40"], ["5ª aula", "16:40", "17:30"]].map(([nome, ini, fim]) => ({ nome, ini, fim }))
+      medio: [["1ª aula", "07:00", "07:50"], ["2ª aula", "07:50", "08:40"], ["3ª aula", "08:40", "09:30"], ["4ª aula", "09:50", "10:40"], ["5ª aula", "10:40", "11:30"], ["6ª aula", "11:30", "12:20"]].map(([nome, ini, fim], i) => ({ id: "m" + (i + 1), nome, ini, fim })),
+      fund: [["1ª aula", "13:00", "13:50"], ["2ª aula", "13:50", "14:40"], ["3ª aula", "14:40", "15:30"], ["4ª aula", "15:50", "16:40"], ["5ª aula", "16:40", "17:30"]].map(([nome, ini, fim], i) => ({ id: "f" + (i + 1), nome, ini, fim }))
     }
   };
 }
@@ -496,7 +496,7 @@ function listen(name, ref, apply) {
 const docsOf = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
 function subscribeAll() {
-  listen("config", DB.doc("config/main"), s => { S.config = s.exists ? { ...defaultConfig(), ...s.data() } : null; S.configLoaded = true; });
+  listen("config", DB.doc("config/main"), s => { S.config = s.exists ? { ...defaultConfig(), ...s.data() } : null; S.configLoaded = true; setTimeout(garantirIdsAulas); });
   if (MODE !== "firebase") subscribePessoas();
   listen("abertos", DB.collection("emprestimos").where("aberto", "==", true), s => {
     const antes = new Set(S.abertos.flatMap(e => aConferir(e).map(c => e.id + c))), primeira = !S.abertosOk;
@@ -519,6 +519,7 @@ function subscribeAll() {
   if (MODE === "firebase") listen("meuAc", DB.doc("acessos/" + meuEmail()), s => { S.meuAc = s.exists ? { id: s.id, ...s.data() } : null; aposAcesso(); });
 }
 function aposAcesso() {
+  setTimeout(garantirIdsAulas);
   if (isEquipe() && !unsub.pessoas) subscribePessoas();
   if (isEquipe() && !unsub.futuras) subscribeFuturas();
   if (isEquipe() && !unsub.acessos) listen("acessos", DB.collection("acessos"), s => {
@@ -532,6 +533,14 @@ function aposAcesso() {
   const a = meuAcesso();
   if (!operador && a && a.nome) { operador = { id: "login:" + a.id, nome: a.nome, cargo: PAPEIS[a.papel] || "" }; store.set(opKey(), operador); }
   else if (!operador && souDono()) { operador = { id: "login:" + meuEmail(), nome: "Coordenação", cargo: "" }; store.set(opKey(), operador); }
+}
+let idsAulasFeito = false;
+function garantirIdsAulas() {
+  if (idsAulasFeito || !isAdmin() || !S.config) return;
+  const c = JSON.parse(JSON.stringify(S.config)); delete c.id; let mudou = false;
+  for (const seg of Object.keys(SEGS)) (c.horarios[seg] || []).forEach((a, i) => { if (!a.id) { a.id = seg[0] + "p" + (i + 1); mudou = true; } });
+  idsAulasFeito = true;
+  if (mudou) write(() => DB.doc("config/main").set(c));
 }
 function subscribePessoas() { listen("pessoas", DB.collection("pessoas"), s => { S.pessoas = docsOf(s).sort((a, b) => norm(a.nome) < norm(b.nome) ? -1 : 1); }); }
 function subscribeHist() { listen("hist", DB.collection("emprestimos").orderBy("retiradoEm", "desc").limit(ui.histLimit), s => { S.hist = docsOf(s); }); }
@@ -603,10 +612,16 @@ function codeGrid(codes, btn) {
   return [...g].map(([m, l]) => `<div class="grp"><span>${esc(m || "Sem modelo")}</span><span>${l.length}</span></div><div class="codes">${l.map(btn).join("")}</div>`).join("");
 }
 const ativa = (r) => r.status !== "recusado";
+// Cada aula tem um id fixo: mudar horário ou apagar outra aula não troca os agendamentos de lugar.
+// Agendamentos antigos (sem aulaId) continuam achando a aula pela posição.
+const aulasDe = (seg) => cfg().horarios[seg] || [];
+function aulaDe(r) { const l = aulasDe(r.seg); return r.aulaId ? l.find(a => a.id === r.aulaId) : l[r.aula]; }
+function naAula(r, seg, idx) { const a = aulasDe(seg)[idx]; return r.seg === seg && (r.aulaId ? !!a && a.id === r.aulaId : r.aula === idx); }
+const posAula = (r) => { const l = aulasDe(r.seg), i = r.aulaId ? l.findIndex(a => a.id === r.aulaId) : r.aula; return i < 0 ? 99 : Number(i) || 0; };
 // Até quando a retirada deve voltar: fim da aula agendada (+30 min) ou o horário limite do dia.
 function prazoDevolucao(st) {
   const r = st.resId && [...S.reservas, ...S.resHoje].find(x => x.id === st.resId);
-  const a = r && (cfg().horarios[r.seg] || [])[r.aula];
+  const a = r && aulaDe(r);
   if (a && /^\d\d:\d\d$/.test(a.fim || "")) { const [h, m] = a.fim.split(":").map(Number), d = keyToDate(r.data); d.setHours(h, m + 30, 0, 0); return d.getTime(); }
   const [h, m] = String(cfg().limite || "18:00").split(":").map(Number), d = new Date();
   d.setHours(isNaN(h) ? 18 : h, isNaN(m) ? 0 : m, 0, 0);
@@ -644,7 +659,7 @@ function resumoCodes(codes, tipo) {
 // Quantos ainda dá para agendar numa aula: no total e de cada modelo.
 function livresSlot(t, seg, idx) {
   const st = stats(t), par = paradosMap();
-  const res = S.reservas.filter(r => r.tipo === t && r.seg === seg && r.aula === idx && ativa(r));
+  const res = S.reservas.filter(r => r.tipo === t && naAula(r, seg, idx) && ativa(r));
   const total = Math.max(0, st.parque - st.manut - res.reduce((a, r) => a + (Number(r.qtd) || 0), 0));
   const porModelo = {};
   for (const m of modelosDe(t)) {
@@ -796,11 +811,11 @@ function installCard() {
 }
 
 function agendadosHoje(t) {
-  const ordem = (r) => (r.seg === "medio" ? 0 : 100) + (Number(r.aula) || 0);
+  const ordem = (r) => (r.seg === "medio" ? 0 : 100) + posAula(r);
   const lista = S.resHoje.filter(r => r.tipo === t && (ativa(r) || r.criadoPorEmail === meuEmail())).sort((a, b) => ordem(a) - ordem(b));
   if (!lista.length) return "";
   const feito = (r) => r.retirado || S.abertos.some(e => e.reservaId === r.id);
-  const rows = lista.map(r => { const a = (cfg().horarios[r.seg] || [])[r.aula] || {};
+  const rows = lista.map(r => { const a = aulaDe(r) || {};
     const al = isEquipe() && ativa(r) ? alertaRes(r) : "";
     return `<div class="row" style="flex-wrap:wrap"><div class="grow" style="min-width:180px"><div class="t">${esc(r.pessoaNome)}${al ? ` <span class="badge late">${al}</span>` : ""}</div><div class="s">${esc(a.nome || r.aulaNome || "")}${a.ini ? ` (${esc(a.ini)} às ${esc(a.fim)})` : ""} · ${SEGS[r.seg] || ""} · <b style="color:var(--ink)">${esc(resumoItens(r.itens, r.qtd, r.tipo))}</b>${r.turma ? " · " + esc(r.turma) : ""}${!ativa(r) && r.motivo && r.motivo !== "recusado pela coordenação" ? ` · ${esc(r.motivo)}` : ""}</div></div>
       ${!ativa(r) ? `<span class="badge late">recusado pela coordenação</span>` : feito(r) ? `<span class="badge">retirado</span>` : isEquipe() ? `<div style="display:flex;gap:6px"><button class="mini ${ui.armed === "nega:" + r.id ? "warn" : ""}" data-act="recusar-res" data-id="${r.id}">${ui.armed === "nega:" + r.id ? "Confirmar" : "Recusar"}</button><button class="btn go sm" data-act="retirar-res" data-id="${r.id}">Retirar</button></div>` : `<span class="badge">aguardando liberação</span>`}</div>`; }).join("");
@@ -865,7 +880,7 @@ function vAgenda() {
   const passado = ui.date < dayKey();
   const aulas = cfg().horarios[ui.seg] || [];
   const slots = aulas.map((a, i) => {
-    const res = S.reservas.filter(r => r.tipo === ui.tipo && r.seg === ui.seg && r.aula === i);
+    const res = S.reservas.filter(r => r.tipo === ui.tipo && naAula(r, ui.seg, i));
     const livres = livresSlot(ui.tipo, ui.seg, i).total;
     return `<div class="slot">
       <div><div class="t">${esc(a.nome)}</div><div class="s">${esc(a.ini)} às ${esc(a.fim)}</div></div>
@@ -886,6 +901,8 @@ function vAgenda() {
     </div>
     ${tipoSeg("", ui.tipo, "tipo")}
     <div class="seg small soft" role="group" aria-label="Segmento">${Object.entries(SEGS).map(([k, l]) => `<button data-act="seg" data-v="${k}" aria-pressed="${ui.seg === k}">${l}</button>`).join("")}</div>
+    ${(() => { const orf = S.reservas.filter(r => r.tipo === ui.tipo && r.seg === ui.seg && ativa(r) && !aulaDe(r)); return orf.length ? `<section class="card" style="border-color:var(--danger)"><div class="sec-h"><h2 style="color:var(--danger)">Agendamentos de aula removida</h2></div><p class="note" style="margin:0 0 6px">A aula destes agendamentos foi apagada dos horários. Recuse ou cancele, e agende de novo na aula certa.</p>
+      <div class="res">${orf.map(r => `<div class="res-i"><div class="grow"><b>${esc(r.pessoaNome)}</b> · ${esc(r.aulaNome || "")} · ${esc(resumoItens(r.itens, r.qtd, r.tipo))}</div>${isEquipe() ? `<button class="mini ${ui.armed === "nega:" + r.id ? "warn" : ""}" data-act="recusar-res" data-id="${r.id}">${ui.armed === "nega:" + r.id ? "Confirmar" : "Recusar"}</button>` : ""}</div>`).join("")}</div></section>` : ""; })()}
     ${passado ? `<div class="note" style="text-align:center">Esse dia já passou: dá para ver os agendamentos, mas não criar novos.</div>` : ""}
     <section class="card">${slots || `<div class="empty">Nenhuma aula cadastrada para o ${SEGS[ui.seg]}.${isAdmin() ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px"><button class="btn sm" data-act="horarios-padrao">Usar horários padrão</button><button class="btn ghost sm" data-act="ir-ajustes">Ajustar horários</button></div>` : " Peça à coordenação para cadastrar os horários."}</div>`}</section>`;
 }
@@ -1540,10 +1557,10 @@ const acts = {
     if (qtd < 1) return toast(ms.length ? "Digite quantos de cada modelo." : "Digite a quantidade.");
     if (qtd > livres) return toast(`Só há ${livres} livres nesse horário.`);
     t.disabled = true;
-    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, aulaNome: cfg().horarios[ui.seg][st.aula].nome, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, ...(itens ? { itens } : {}), turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() || (meuAcesso() || {}).nome || meuEmail(), criadoPorEmail: meuEmail() };
+    const r = { data: ui.date, tipo: ui.tipo, seg: ui.seg, aula: st.aula, ...(aulasDe(ui.seg)[st.aula].id ? { aulaId: aulasDe(ui.seg)[st.aula].id } : {}), aulaNome: aulasDe(ui.seg)[st.aula].nome, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, qtd, ...(itens ? { itens } : {}), turma: st.turma.trim(), obs: st.obs.trim(), criadoEm: Date.now(), criadoPor: opNome() || (meuAcesso() || {}).nome || meuEmail(), criadoPorEmail: meuEmail() };
     if (await write(() => DB.collection("reservas").doc().set(r), isEquipe() ? "Agendado" : "Agendado. A coordenação foi avisada.")) {
       modal.close();
-      if (!isAdmin()) { const a = cfg().horarios[r.seg][r.aula] || {}; avisarEmail({ tipo: "agendamento", pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || ""} (${a.ini || ""} às ${a.fim || ""}) · ${SEGS[r.seg]}`, itens: resumoItens(r.itens, r.qtd, r.tipo), turma: r.turma, obs: r.obs, por: r.criadoPor }); }
+      if (!isAdmin()) { const a = aulaDe(r) || {}; avisarEmail({ tipo: "agendamento", pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || ""} (${a.ini || ""} às ${a.fim || ""}) · ${SEGS[r.seg]}`, itens: resumoItens(r.itens, r.qtd, r.tipo), turma: r.turma, obs: r.obs, por: r.criadoPor }); }
     } else t.disabled = false;
   },
   async "recusar-res"(t) {
@@ -1551,7 +1568,7 @@ const acts = {
     const r = [...S.reservas, ...S.resHoje].find(x => x.id === t.dataset.id); if (!r) return;
     if (await recusarReservas([r], "recusado pela coordenação")) {
       toast(`Agendamento de ${r.pessoaNome.split(" ")[0]} recusado. Os equipamentos voltam a ficar livres.`, 5000);
-      const a = cfg().horarios[r.seg] && cfg().horarios[r.seg][r.aula] || {};
+      const a = aulaDe(r) || {};
       if (r.criadoPorEmail && r.criadoPorEmail !== meuEmail()) avisarEmail({ tipo: "recusado", para: r.criadoPorEmail, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });
     }
   },
@@ -1698,7 +1715,7 @@ const acts = {
   },
   async "reativar-p"(t) { await write(() => DB.doc("pessoas/" + t.dataset.id).update({ ativo: true }), "Pessoa reativada"); },
   "ver-inativos"() { ui.showInativos = !ui.showInativos; render(); },
-  "h-add"(t) { const seg = t.dataset.seg; const c = readCfgForm(); const l = c.horarios[seg]; const last = l[l.length - 1]; l.push({ nome: `${l.length + 1}ª aula`, ini: last ? last.fim : "07:00", fim: "" }); S.config = c; ui.noKeep = true; render(); },
+  "h-add"(t) { const seg = t.dataset.seg; const c = readCfgForm(); const l = c.horarios[seg]; const last = l[l.length - 1]; l.push({ id: seg[0] + uid(), nome: `${l.length + 1}ª aula`, ini: last ? last.fim : "07:00", fim: "" }); S.config = c; ui.noKeep = true; render(); },
   "h-del"(t) {
     const k = "h:" + t.dataset.seg + t.dataset.i;
     if (ui.armed !== k) { const c = readCfgForm(); S.config = c; ui.armed = k; ui.noKeep = true; return render(); }
@@ -1814,7 +1831,7 @@ function readCfgForm() {
   const lim = $("#c-limite"); if (lim && /^\d\d:\d\d$/.test(lim.value)) c.limite = lim.value;
   for (const seg of Object.keys(SEGS)) c.horarios[seg] = (c.horarios[seg] || []).map((a, i) => {
     const g = (f) => { const el = $(`#h-${seg}-${i}-${f}`); return el ? el.value.trim() : a[f]; };
-    return { nome: g("nome") || a.nome, ini: g("ini"), fim: g("fim") };
+    return { id: a.id || seg[0] + uid(), nome: g("nome") || a.nome, ini: g("ini"), fim: g("fim") };
   });
   return c;
 }
