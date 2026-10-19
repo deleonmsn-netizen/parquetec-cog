@@ -697,6 +697,8 @@ function render() {
     $("#main").innerHTML = ui.verificar ? vVerificar() : vSemAcesso(); return;
   }
   if (!S.configLoaded) return;
+  // Sem tablets (ou sem notebooks), fica no tipo que existe.
+  for (const k of ["tipo", "gerTipo"]) if (!temTipo(ui[k]) && temTipo(ui[k] === "NB" ? "TB" : "NB")) ui[k] = ui[k] === "NB" ? "TB" : "NB";
   const views = { painel: vPainel, agenda: vAgenda, recados: vRecados, historico: vHistorico, gerenciar: vGerenciar };
   // Guarda o que a pessoa digitou: atualizações de outros aparelhos redesenham a tela.
   const kept = ui.noKeep ? [] : [...document.querySelectorAll("#main input[id], #main textarea[id], #main select[id]")]
@@ -709,7 +711,10 @@ function render() {
   if (modal.render) modal.refresh();
 }
 
+// Só mostra a escolha Notebooks/Tablets quando a escola tem os dois.
+const temTipo = (t) => codesFor(t).length > 0;
 function tipoSeg(id, val, act) {
+  if (!(temTipo("NB") && temTipo("TB"))) return "";
   return `<div class="seg" role="group" aria-label="Tipo de equipamento">${Object.entries(TIPOS).map(([k, t]) => `<button data-act="${act}" data-v="${k}" aria-pressed="${val === k}" ${id ? `id="${id}-${k}"` : ""}>${t.nome}</button>`).join("")}</div>`;
 }
 
@@ -882,7 +887,7 @@ function vAgenda() {
     ${tipoSeg("", ui.tipo, "tipo")}
     <div class="seg small soft" role="group" aria-label="Segmento">${Object.entries(SEGS).map(([k, l]) => `<button data-act="seg" data-v="${k}" aria-pressed="${ui.seg === k}">${l}</button>`).join("")}</div>
     ${passado ? `<div class="note" style="text-align:center">Esse dia já passou: dá para ver os agendamentos, mas não criar novos.</div>` : ""}
-    <section class="card">${slots || `<div class="empty">Nenhum horário cadastrado para ${SEGS[ui.seg]}. Adicione em Gerenciar.</div>`}</section>`;
+    <section class="card">${slots || `<div class="empty">Nenhuma aula cadastrada para o ${SEGS[ui.seg]}.${isAdmin() ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px"><button class="btn sm" data-act="horarios-padrao">Usar horários padrão</button><button class="btn ghost sm" data-act="ir-ajustes">Ajustar horários</button></div>` : " Peça à coordenação para cadastrar os horários."}</div>`}</section>`;
 }
 
 function vRecados() {
@@ -1451,6 +1456,12 @@ const acts = {
   seg(t) { ui.seg = t.dataset.v; store.set("seg", ui.seg); render(); },
   dia(t) { const d = keyToDate(ui.date); d.setDate(d.getDate() + Number(t.dataset.v)); ui.date = dayKey(d); subscribeReservas(); render(); },
   operador() { openOperador(); },
+  async "horarios-padrao"() {
+    const c = JSON.parse(JSON.stringify(cfg())); delete c.id;
+    c.horarios = c.horarios || {}; c.horarios[ui.seg] = defaultConfig().horarios[ui.seg];
+    await write(() => DB.doc("config/main").set(c), `Horários do ${SEGS[ui.seg]} cadastrados. Dá para mudar em Gerenciar → Ajustes.`);
+  },
+  "ir-ajustes"() { ui.tab = "gerenciar"; ui.gerAba = "ajustes"; store.set("tab", ui.tab); render(); window.scrollTo(0, 0); },
   imprimir() { modal.open(mImprimir, {}); },
   retirar() { if (!S.config) return toast("Primeiro diga quantos equipamentos a escola tem."); if (!operador) toast("Dica: toque em Trocar, no topo, para registrar quem está autorizando."); openRetirar(); },
   devolver(t) { openDevolver(t.dataset.id); },
