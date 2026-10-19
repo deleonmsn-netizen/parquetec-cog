@@ -1025,7 +1025,7 @@ function vGerenciar() {
       <label class="f n">Nome<input class="inp" id="h-${seg}-${i}-nome" value="${esc(a.nome)}"></label>
       <label class="f">Início<input class="inp" id="h-${seg}-${i}-ini" type="time" value="${esc(a.ini)}"></label>
       <label class="f">Fim<input class="inp" id="h-${seg}-${i}-fim" type="time" value="${esc(a.fim)}"></label>
-      <button class="x hx" data-act="h-del" data-seg="${seg}" data-i="${i}" aria-label="Remover ${esc(a.nome)}">×</button></div>`).join("");
+      <button class="${ui.armed === "h:" + seg + i ? "mini warn" : "x"} hx" data-act="h-del" data-seg="${seg}" data-i="${i}" aria-label="Remover ${esc(a.nome)}">${ui.armed === "h:" + seg + i ? "Apagar?" : "×"}</button></div>`).join("");
   const aba = adm ? (ui.gerAba || (S.pedidos.length && MODE === "firebase" ? "acessos" : "pessoas")) : "pessoas";
   const abas = adm ? [["pessoas", "Pessoas"], ["equip", "Equipamentos"], ...(MODE === "firebase" ? [["acessos", S.pedidos.length ? `Acessos (${S.pedidos.length})` : "Acessos"]] : []), ["ajustes", "Ajustes"]] : [];
   const segAbas = abas.length ? `<div class="seg small" role="group" aria-label="Partes do Gerenciar">${abas.map(([k, l]) => `<button data-act="ger-aba" data-v="${k}" aria-pressed="${aba === k}">${l}</button>`).join("")}</div>` : "";
@@ -1699,7 +1699,10 @@ const acts = {
   async "reativar-p"(t) { await write(() => DB.doc("pessoas/" + t.dataset.id).update({ ativo: true }), "Pessoa reativada"); },
   "ver-inativos"() { ui.showInativos = !ui.showInativos; render(); },
   "h-add"(t) { const seg = t.dataset.seg; const c = readCfgForm(); const l = c.horarios[seg]; const last = l[l.length - 1]; l.push({ nome: `${l.length + 1}ª aula`, ini: last ? last.fim : "07:00", fim: "" }); S.config = c; ui.noKeep = true; render(); },
-  "h-del"(t) { const c = readCfgForm(); c.horarios[t.dataset.seg].splice(Number(t.dataset.i), 1); S.config = c; ui.noKeep = true; render(); },
+  "h-del"(t) {
+    const k = "h:" + t.dataset.seg + t.dataset.i;
+    if (ui.armed !== k) { const c = readCfgForm(); S.config = c; ui.armed = k; ui.noKeep = true; return render(); }
+    ui.armed = null; const c = readCfgForm(); c.horarios[t.dataset.seg].splice(Number(t.dataset.i), 1); S.config = c; ui.noKeep = true; render(); },
   async login(t) {
     const email = $("#lg-email").value.trim(), senha = $("#lg-senha").value;
     if (!email || !senha) return toast("Preencha e-mail e senha.");
@@ -1793,7 +1796,10 @@ const acts = {
   async instalar() { if (!installEvt) return; installEvt.prompt(); try { await installEvt.userChoice; } catch {} installEvt = null; render(); },
   "instalar-depois"() { store.set("installDispensado", true); render(); },
   async "copiar-url"() { const el = $("#app-url"); try { await navigator.clipboard.writeText(el.value); toast("Endereço copiado. Mande pelo WhatsApp para quem vai usar."); } catch { el.select(); toast("Selecione e copie o endereço."); } },
-  async "salvar-cfg"() {
+  async "salvar-cfg"(t) {
+    const vazios = Object.entries(SEGS).filter(([seg]) => !(readCfgForm().horarios[seg] || []).length).map(([, l]) => l);
+    if (vazios.length && ui.armed !== "cfg-vazio") { ui.armed = "cfg-vazio"; t.textContent = "Salvar mesmo assim"; t.classList.add("danger"); return toast(`Atenção: ${vazios.join(" e ")} vai ficar sem nenhuma aula, e ninguém vai conseguir agendar. Toque de novo para salvar mesmo assim.`, 7000); }
+    ui.armed = null;
     const c = readCfgForm(), pin = $("#c-pin").value.trim(), off = $("#c-pin-off");
     if (off && off.checked) c.pinHash = ""; else if (pin) { if (pin.length < 4) return toast("Use um PIN de pelo menos 4 dígitos."); c.pinHash = await sha(pin); ui.unlocked = true; }
     const { id, ...body } = c;
@@ -1819,7 +1825,7 @@ document.addEventListener("click", (ev) => {
   const a = t.dataset.act; if (!acts[a]) return;
   if (a === "ov" && ev.target !== t) return;
   if (a !== "wa") ev.preventDefault();
-  if (!/^(cancelar-res|recusar-res|apagar-rec|desativar-p|remover-acesso|recusar)$/.test(a) && ui.armed) { ui.armed = null; if (!t.closest("#modal")) render(); }
+  if (!/^(cancelar-res|recusar-res|apagar-rec|desativar-p|remover-acesso|recusar|h-del|salvar-cfg)$/.test(a) && ui.armed) { ui.armed = null; if (!t.closest("#modal")) render(); }
   acts[a](t, ev);
 });
 document.addEventListener("input", (ev) => {
