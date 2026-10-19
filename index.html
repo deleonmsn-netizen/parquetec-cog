@@ -501,7 +501,7 @@ function subscribeAll() {
   if (MODE !== "firebase") subscribePessoas();
   listen("abertos", DB.collection("emprestimos").where("aberto", "==", true), s => {
     const antes = new Set(S.abertos.flatMap(e => aConferir(e).map(c => e.id + c))), primeira = !S.abertosOk;
-    S.abertos = docsOf(s).sort((a, b) => b.retiradoEm - a.retiradoEm); S.abertosOk = true;
+    S.abertos = docsOf(s).filter(e => Array.isArray(e.codes) && e.retiradoEm).sort((a, b) => b.retiradoEm - a.retiradoEm); S.abertosOk = true;
     if (primeira || !isEquipe()) return;
     for (const e of S.abertos) { const novos = aConferir(e).filter(c => !antes.has(e.id + c)); if (novos.length) avisarAparelho("Devolução para conferir", `${e.pessoaNome} marcou ${resumoCodes(novos, e.tipo)} como devolvido.`); }
   });
@@ -564,8 +564,8 @@ function subscribeResHoje() {
   listen("resHoje", DB.collection("reservas").where("data", "==", dayKey()), s => {
     const antes = new Map(S.resHoje.map(r => [r.id, r.status])), antesAp = new Set(S.resHoje.filter(r => r.aprovado).map(r => r.id)), primeira = !S.resHojeOk;
     S.resHoje = docsOf(s); S.resHojeOk = true;
-    if (!primeira && !isEquipe()) for (const r of S.resHoje) if (r.aprovado && ativa(r) && !antesAp.has(r.id) && antes.has(r.id) && paraMim(r)) avisarAparelho("Agendamento aprovado", `Seu agendamento de hoje (${resumoItens(r.itens, r.qtd, r.tipo)}) foi aprovado. Na hora, toque em Retirar.`);
-    if (!primeira) for (const r of S.resHoje) if (r.status === "recusado" && antes.has(r.id) && antes.get(r.id) !== "recusado" && r.criadoPorEmail === meuEmail()) avisarAparelho("Agendamento recusado", `A coordenação recusou seu agendamento de hoje (${resumoItens(r.itens, r.qtd, r.tipo)}).`);
+    if (!primeira && !isEquipe()) for (const r of S.resHoje) if (r.aprovado === true && ativa(r) && !antesAp.has(r.id) && antes.has(r.id) && paraMim(r)) avisarAparelho("Agendamento aprovado", `Seu agendamento de hoje (${resumoItens(r.itens, r.qtd, r.tipo)}) foi aprovado. Na hora, toque em Retirar.`);
+    if (!primeira) for (const r of S.resHoje) if (r.status === "recusado" && antes.has(r.id) && antes.get(r.id) !== "recusado" && paraMim(r)) avisarAparelho("Agendamento recusado", `A coordenação recusou seu agendamento de hoje (${resumoItens(r.itens, r.qtd, r.tipo)}).`);
   });
 }
 function subscribeReservas() { listen("reservas", DB.collection("reservas").where("data", "==", ui.date), s => { S.reservas = docsOf(s); }); }
@@ -626,7 +626,7 @@ const posAula = (r) => { const l = aulasDe(r.seg), i = r.aulaId ? l.findIndex(a 
 function prazoDevolucao(st) {
   const r = st.resId && [...S.reservas, ...S.resHoje].find(x => x.id === st.resId);
   const a = r && aulaDe(r);
-  if (a && /^\d\d:\d\d$/.test(a.fim || "")) { const [h, m] = a.fim.split(":").map(Number), d = keyToDate(r.data); d.setHours(h, m + 30, 0, 0); return d.getTime(); }
+  if (a && /^\d\d:\d\d$/.test(a.fim || "")) { const [h, m] = a.fim.split(":").map(Number), d = keyToDate(r.data); d.setHours(h, m + 30, 0, 0); if (d.getTime() > Date.now() + 15 * 60000) return d.getTime(); }
   const [h, m] = String(cfg().limite || "18:00").split(":").map(Number), d = new Date();
   d.setHours(isNaN(h) ? 18 : h, isNaN(m) ? 0 : m, 0, 0);
   if (d.getTime() < Date.now() + 30 * 60000) d.setDate(d.getDate() + 1);
@@ -650,9 +650,11 @@ async function recusarReservas(lista, motivo) {
 }
 // Agendamento do professor fica aguardando aprovação; depois de aprovado, ele mesmo retira.
 const feitoRes = (r) => !!(r.retirado || S.abertos.some(e => e.reservaId === r.id));
-const pendente = (r) => ativa(r) && !r.aprovado && !feitoRes(r);
-const paraMim = (r) => !!meuEmail() && ("paraEmail" in r ? r.paraEmail : r.criadoPorEmail) === meuEmail();
-const podeRetirar = (r) => ativa(r) && r.aprovado && !feitoRes(r) && r.data === dayKey() && (isEquipe() || paraMim(r));
+// Agendamentos de antes da aprovação (sem o campo "aprovado") contam como aprovados, mas só a equipe retira.
+const pendente = (r) => ativa(r) && r.aprovado === false && !feitoRes(r);
+const destinoRes = (r) => "paraEmail" in r ? r.paraEmail : r.criadoPorEmail;
+const paraMim = (r) => !!meuEmail() && (destinoRes(r) === meuEmail() || (!!r.pessoaId && r.pessoaId === (meuAcesso() || {}).pessoaId));
+const podeRetirar = (r) => ativa(r) && !pendente(r) && !feitoRes(r) && r.data === dayKey() && (isEquipe() || (r.aprovado === true && paraMim(r)));
 const loginDaPessoa = (id) => { const a = S.acessos.find(x => x.pessoaId && x.pessoaId === id); return a ? a.id : ""; };
 const somaQ = (o) => Object.values(o || {}).reduce((a, n) => a + (parseInt(n) || 0), 0);
 function resumoItens(itens, total, tipo) {
@@ -832,7 +834,7 @@ function agendadosHoje(t) {
     if (feitoRes(r)) return `<span class="badge">retirado</span>`;
     if (isEquipe() && pendente(r)) return `<div style="display:flex;gap:6px">${nega(r)}<button class="btn go sm" data-act="aprovar-res" data-id="${r.id}">Aprovar</button></div>`;
     if (pendente(r)) return `<span class="badge">aguardando aprovação</span>`;
-    if (paraMim(r)) return `<button class="btn go sm" data-act="retirar-res" data-id="${r.id}">Retirar</button>`;
+    if (!isEquipe() && podeRetirar(r)) return `<button class="btn go sm" data-act="retirar-res" data-id="${r.id}">Retirar</button>`;
     if (isEquipe()) return `<div style="display:flex;gap:6px;align-items:center"><span class="badge">aprovado</span>${nega(r)}<button class="mini" data-act="retirar-res" data-id="${r.id}" title="Registrar a retirada pelo professor">Retirar</button></div>`;
     return `<span class="badge">aprovado</span>`;
   };
@@ -875,7 +877,7 @@ function vPainel() {
           : meu && pend.length > conf.length ? `<button class="btn back sm" data-act="devolvi" data-id="${e.id}">Devolvi</button>` : ""}</div>`;
     }).join("")}</div>`;
   }
-  const quem = operador || !isEquipe() ? "" : `<div class="install"><div class="grow"><b>Quem está usando este aparelho?</b>O nome escolhido aparece como “autorizado por” nas retiradas.</div><button class="btn sm" data-act="operador">Escolher</button></div>`;
+  const quem = operador || !isEquipe() || MODE === "firebase" ? "" : `<div class="install"><div class="grow"><b>Quem está usando este aparelho?</b>O nome escolhido aparece como “autorizado por” nas retiradas.</div><button class="btn sm" data-act="operador">Escolher</button></div>`;
   const atrs = S.abertos.filter(e => atrasado(e) && (isEquipe() || e.responsavelEmail === meuEmail()));
   const atrasos = atrs.length ? `<section class="card" style="border-color:var(--danger)"><div class="sec-h"><h2 style="color:var(--danger)">${isEquipe() ? "Devoluções atrasadas" : "Sua devolução está atrasada"}</h2><span class="note">${atrs.length}</span></div>
     <div class="list">${atrs.map(e => { const pend = pendentes(e).filter(c => !aConferir(e).includes(c)); return `<div class="row"><div class="grow"><div class="t">${esc(e.pessoaNome)}</div><div class="s">${esc(resumoCodes(pend, e.tipo))} · devia voltar ${fmtPrazo(prazoDe(e))} · ${pend.join(", ")}</div></div>${isEquipe() ? `<button class="btn back sm" data-act="devolver" data-id="${e.id}">Devolver</button>` : e.responsavelEmail === meuEmail() ? `<button class="btn back sm" data-act="devolvi" data-id="${e.id}">Devolvi</button>` : ""}</div>`; }).join("")}</div></section>` : "";
@@ -1344,7 +1346,8 @@ function mRetirar(st) {
 // E-mail do login de quem levou (o professor do agendamento, ou o login ligado à pessoa).
 function responsavelDe(st) {
   const r = st.resId && [...S.reservas, ...S.resHoje].find(x => x.id === st.resId);
-  const ra = r && ("paraEmail" in r ? r.paraEmail : r.criadoPorEmail);
+  if (st.fixo) return meuEmail();
+  const ra = r && destinoRes(r);
   if (ra) return ra;
   return loginDaPessoa(st.pessoa.id);
 }
@@ -1529,6 +1532,8 @@ const acts = {
   "rt-limpar"() { modal.state.sel.clear(); modal.draw(); },
   async "rt-ok"(t) {
     const st = modal.state; if (!st.pessoa || !st.sel.size) return;
+    const rs = st.resId && [...S.reservas, ...S.resHoje].find(x => x.id === st.resId);
+    if (st.resId && (!rs || !ativa(rs) || feitoRes(rs) || (st.fixo && !podeRetirar(rs)))) { modal.close(); return toast(!rs || !ativa(rs) ? "Esse agendamento foi cancelado ou recusado." : "Esse agendamento já foi retirado.", 5000); }
     const disp = new Set(disponiveis(st.tipo)), codes = [...st.sel].filter(c => disp.has(c)).sort();
     if (codes.length !== st.sel.size) { toast("Alguns equipamentos acabaram de ser retirados em outro aparelho. Confira a seleção."); return modal.draw(); }
     if (st.fixo) {
@@ -1537,7 +1542,8 @@ const acts = {
     }
     t.disabled = true;
     const e = { aberto: true, tipo: st.tipo, codes, pessoaId: st.pessoa.id, pessoaNome: st.pessoa.nome, pessoaCargo: st.pessoa.cargo || "", devolverAte: prazoDevolucao(st), finalidade: st.fin, turma: st.turma.trim(), obs: st.obs.trim(), retiradoEm: Date.now(), operador: st.fixo ? st.aprovadoPor : opNome(), ...(st.fixo ? { retiradoPeloProfessor: true } : {}), devolvidos: {}, devolvidoEm: null, ...(st.resId ? { reservaId: st.resId } : {}), responsavelEmail: responsavelDe(st) };
-    const ok = await write(() => DB.collection("emprestimos").doc().set(e), `${codes.length} ${codes.length === 1 ? TIPOS[st.tipo].um + " retirado" : TIPOS[st.tipo].nome.toLowerCase() + " retirados"} por ${st.pessoa.nome.split(" ")[0]}`);
+    // Retirada do próprio professor tem código fixo: o mesmo agendamento não vira duas retiradas.
+    const ok = await write(() => (st.fixo ? DB.doc("emprestimos/r-" + st.resId) : DB.collection("emprestimos").doc()).set(e), `${codes.length} ${codes.length === 1 ? TIPOS[st.tipo].um + " retirado" : TIPOS[st.tipo].nome.toLowerCase() + " retirados"} por ${st.pessoa.nome.split(" ")[0]}`);
     if (ok) {
       modal.close(); if (ui.tab !== "painel" && ui.tab !== "agenda") { ui.tab = "painel"; render(); }
       if (st.resId) write(() => DB.doc("reservas/" + st.resId).update({ retirado: true, retiradoEm: Date.now() }));
@@ -1600,7 +1606,8 @@ const acts = {
     if (await recusarReservas([r], "recusado pela coordenação")) {
       toast(`Agendamento de ${r.pessoaNome.split(" ")[0]} recusado. Os equipamentos voltam a ficar livres.`, 5000);
       const a = aulaDe(r) || {};
-      if (r.criadoPorEmail && r.criadoPorEmail !== meuEmail()) avisarEmail({ tipo: "recusado", para: r.criadoPorEmail, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });
+      const para = destinoRes(r) || loginDaPessoa(r.pessoaId);
+      if (para && para !== meuEmail()) avisarEmail({ tipo: "recusado", para, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });
     }
   },
   async "cancelar-res"(t) { const k = "res:" + t.dataset.id; if (ui.armed !== k) { ui.armed = k; return render(); } ui.armed = null; await write(() => DB.doc("reservas/" + t.dataset.id).delete(), "Agendamento cancelado"); },
@@ -1613,7 +1620,7 @@ const acts = {
     const r = [...S.reservas, ...S.resHoje, ...S.futuras].find(x => x.id === t.dataset.id); if (!r || !pendente(r)) return;
     t.disabled = true;
     const por = opNome() || meuEmail();
-    const para = "paraEmail" in r ? r.paraEmail : r.criadoPorEmail;
+    const para = destinoRes(r) || loginDaPessoa(r.pessoaId);
     if (await write(() => DB.doc("reservas/" + r.id).update({ aprovado: true, aprovadoEm: Date.now(), aprovadoPor: por }), `Agendamento de ${r.pessoaNome.split(" ")[0]} aprovado. Na hora, ${para && para !== meuEmail() ? "o professor toca em Retirar" : "toque em Retirar"}.`, 4000)) {
       const a = aulaDe(r) || {};
       if (para && para !== meuEmail()) avisarEmail({ tipo: "agendamentoAprovado", para, pessoa: r.pessoaNome, data: fmtLong.format(keyToDate(r.data)), aula: `${a.nome || r.aulaNome || ""} (${a.ini || ""} às ${a.fim || ""})`, itens: resumoItens(r.itens, r.qtd, r.tipo) });

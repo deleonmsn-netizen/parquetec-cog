@@ -34,7 +34,9 @@ service cloud.firestore {
 
       // Agendamento aprovado, ainda não retirado, de quem está logado.
       function aprovadoPraMim(r) {
-        return r.get("paraEmail", r.criadoPorEmail) == email() && r.get("aprovado", false) == true
+        return (r.get("paraEmail", r.criadoPorEmail) == email()
+            || (acesso() && r.get("pessoaId", "") != "" && get(/databases/$(database)/documents/escolas/$(escola)/acessos/$(email())).data.get("pessoaId", "") == r.pessoaId))
+          && r.get("aprovado", false) == true
           && !("status" in r) && r.get("retirado", false) == false;
       }
 
@@ -61,7 +63,8 @@ service cloud.firestore {
       // O professor retira sozinho só o agendamento dele já aprovado, até a quantidade aprovada.
       // E só pode marcar "devolvi" na retirada dele; quem confere é a equipe.
       match /emprestimos/{d} {
-        allow create: if liberado() && request.resource.data.responsavelEmail == email()
+        allow create: if liberado() && d == "r-" + request.resource.data.reservaId
+          && request.resource.data.responsavelEmail == email()
           && request.resource.data.aberto == true && request.resource.data.devolvidos.size() == 0
           && aprovadoPraMim(get(/databases/$(database)/documents/escolas/$(escola)/reservas/$(request.resource.data.reservaId)).data)
           && request.resource.data.codes.size() >= 1
