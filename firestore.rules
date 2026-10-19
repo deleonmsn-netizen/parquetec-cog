@@ -32,11 +32,22 @@ service cloud.firestore {
         allow delete: if coordenacao();
       }
 
-      // Agenda: a equipe mexe em todos (inclusive recusa); o professor cria e cancela só os dele.
+      // Agendamento aprovado, ainda não retirado, de quem está logado.
+      function aprovadoPraMim(r) {
+        return r.get("paraEmail", r.criadoPorEmail) == email() && r.get("aprovado", false) == true
+          && !("status" in r) && r.get("retirado", false) == false;
+      }
+
+      // Agenda: a equipe mexe em todos (aprova, recusa); o professor cria (fica aguardando aprovação)
+      // e cancela só os dele, e marca como retirado o dele depois de aprovado.
       match /reservas/{d} {
         allow read: if liberado();
-        allow create: if equipe() || (liberado() && request.resource.data.criadoPorEmail == email() && !("status" in request.resource.data));
-        allow update: if equipe();
+        allow create: if equipe() || (liberado() && request.resource.data.criadoPorEmail == email()
+          && request.resource.data.get("paraEmail", email()) == email()
+          && !("status" in request.resource.data) && request.resource.data.get("aprovado", false) == false);
+        allow update: if equipe() || (liberado() && aprovadoPraMim(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["retirado", "retiradoEm"])
+          && request.resource.data.retirado == true);
         allow delete: if equipe() || (liberado() && resource.data.criadoPorEmail == email());
       }
 
@@ -47,8 +58,15 @@ service cloud.firestore {
         allow update, delete: if equipe() || (liberado() && resource.data.autorEmail == email());
       }
 
-      // O professor só pode marcar "devolvi" na retirada dele; quem confere é a equipe.
+      // O professor retira sozinho só o agendamento dele já aprovado, até a quantidade aprovada.
+      // E só pode marcar "devolvi" na retirada dele; quem confere é a equipe.
       match /emprestimos/{d} {
+        allow create: if liberado() && request.resource.data.responsavelEmail == email()
+          && request.resource.data.aberto == true && request.resource.data.devolvidos.size() == 0
+          && aprovadoPraMim(get(/databases/$(database)/documents/escolas/$(escola)/reservas/$(request.resource.data.reservaId)).data)
+          && request.resource.data.codes.size() >= 1
+          && request.resource.data.codes.size() <= get(/databases/$(database)/documents/escolas/$(escola)/reservas/$(request.resource.data.reservaId)).data.qtd
+          && request.resource.data.tipo == get(/databases/$(database)/documents/escolas/$(escola)/reservas/$(request.resource.data.reservaId)).data.tipo;
         allow update: if liberado() && resource.data.responsavelEmail == email()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["aDevolver"]);
       }

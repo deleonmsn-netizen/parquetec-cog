@@ -27,7 +27,7 @@ function doPost(e) {
     assunto = "ParqueTEC: novo agendamento de " + t(d.pessoa, 60);
     corpo = t(d.pessoa, 60) + " agendou equipamentos.\n\nQuando: " + t(d.data) + ", " + t(d.aula) + "\nO quê: " + t(d.itens, 200) + "\n" +
       (d.turma ? "Turma: " + t(d.turma, 40) + "\n" : "") + (d.obs ? "Observação: " + t(d.obs, 200) + "\n" : "") +
-      "\nNo dia, libere a retirada pelo Painel → Agendados para hoje.";
+      "\nPara aprovar ou recusar, abra o app em Painel → Agendados para hoje (ou na Agenda, no dia marcado).";
   } else if (d.tipo === "devolucao") {
     assunto = "ParqueTEC: " + t(d.pessoa, 60) + " marcou uma devolução";
     corpo = t(d.pessoa, 60) + " marcou como devolvido: " + t(d.itens, 200) + "\nCódigos: " + t(d.codigos, 300) + "\n" +
@@ -47,6 +47,10 @@ function doPost(e) {
   } else if (d.tipo === "acessoRecusado" && para) {
     destino = para; assunto = "ParqueTEC: pedido de acesso não aprovado";
     corpo = "Olá, " + t(d.nome, 60) + ".\n\nA coordenação não aprovou seu pedido de acesso ao ParqueTEC. Se achar que foi engano, fale com a coordenação.";
+  } else if (d.tipo === "agendamentoAprovado" && para) {
+    destino = para; assunto = "ParqueTEC: agendamento aprovado";
+    corpo = "Olá, " + t(d.pessoa, 60) + ".\n\nA coordenação aprovou seu agendamento de " + t(d.data) + ", " + t(d.aula) + " (" + t(d.itens, 200) + ").\n" +
+      "Na hora de pegar os equipamentos, abra o app e toque em Retirar, em Painel → Agendados para hoje.";
   } else if (d.tipo === "recusado" && para) {
     destino = para; assunto = "ParqueTEC: agendamento recusado";
     corpo = "Olá, " + t(d.pessoa, 60) + ".\n\nA coordenação recusou seu agendamento de " + t(d.data) + ", " + t(d.aula) + " (" + t(d.itens, 200) + ").\nSe precisar, fale com a coordenação ou faça um novo agendamento.";

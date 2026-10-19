@@ -28,8 +28,8 @@ Depois da configuração inicial, ninguém precisa abrir o Firebase:
 
 Os perfis de acesso são três:
 
-- **Professor**: vê o Painel e a Agenda, agenda para si mesmo (com quantos de cada modelo), escreve recados e marca "Devolvi" nos equipamentos que levou.
-- **Operador**: libera retiradas, confere devoluções, agenda para qualquer pessoa e cadastra pessoas.
+- **Professor**: vê o Painel e a Agenda, agenda para si mesmo (com quantos de cada modelo), retira os equipamentos depois que a coordenação aprova, escreve recados e marca "Devolvi" no que levou.
+- **Operador**: aprova e recusa agendamentos, registra retiradas, confere devoluções, agenda para qualquer pessoa e cadastra pessoas.
 - **Coordenação**: tudo isso e também equipamentos, configurações e acessos.
 
 ### Como o professor entra
@@ -40,9 +40,16 @@ Os perfis de acesso são três:
 
 ### Agendamento, retirada e devolução
 
-1. O professor agenda: dia, aula e quantos de cada modelo (ex.: 10 Multilaser + 5 Positivo). A coordenação recebe um aviso.
-2. No dia, a coordenação libera em **Painel → Agendados para hoje → Retirar**. Os códigos já vêm separados. Se não for liberar, toca em **Recusar**: os equipamentos voltam a ficar livres e o professor vê "recusado pela coordenação". Ao remover o acesso ou desativar uma pessoa, os agendamentos dela são recusados sozinhos.
-3. Na devolução, o professor toca em **Devolvi** e marca os códigos. A coordenação recebe o aviso, confere em **Painel → Devoluções para conferir** e confirma. Só então eles voltam a contar como disponíveis.
+1. O professor agenda: dia, aula e quantos de cada modelo (ex.: 10 Multilaser + 5 Positivo). O agendamento fica **aguardando aprovação** e a coordenação recebe um aviso (no app, com número vermelho na aba Agenda, e por e-mail).
+2. A coordenação toca em **Aprovar** (em **Painel → Agendados para hoje** ou na **Agenda**, no dia marcado). O professor recebe o aviso. Se não for liberar, toca em **Recusar**: os equipamentos voltam a ficar livres e o professor vê "recusado pela coordenação". Ao remover o acesso ou desativar uma pessoa, os agendamentos dela são recusados sozinhos.
+3. Na hora da aula, **o próprio professor toca em Retirar** quando pegar os equipamentos. Os códigos já vêm separados e ele só consegue levar o que foi aprovado. Se ele estiver sem o app, a coordenação pode tocar em Retirar por ele.
+4. Na devolução, o professor toca em **Devolvi** e marca os códigos. A coordenação recebe o aviso, confere em **Painel → Devoluções para conferir** e confirma. Só então eles voltam a contar como disponíveis.
+
+Quando a coordenação ou o operador agenda para alguém, o agendamento já nasce aprovado.
+
+### Trocar de pessoa no mesmo aparelho
+
+Cada pessoa usa o próprio login. Para outra pessoa usar o mesmo celular ou computador, toque em **Sair**, no topo, e entre com o outro e-mail e senha. O nome de quem está logado é o que aparece como "aprovado por" e "autorizado por".
 
 ## Colocar no ar (feito uma vez só)
 
@@ -88,7 +95,7 @@ Também serve qualquer outra hospedagem de site estático (Netlify, Firebase Hos
 ## E-mails que o app manda
 
 - Para a coordenação: pedido de acesso, novo agendamento de professor, devolução marcada pelo professor e devolução atrasada.
-- Para o professor: acesso liberado ou recusado, agendamento recusado e devolução atrasada.
+- Para o professor: acesso liberado ou recusado, agendamento aprovado ou recusado e devolução atrasada.
 - Limites de segurança no script: no máximo 80 e-mails por dia e 6 para a mesma pessoa, sem links vindos de fora.
 
 ## Avisos para a coordenação
