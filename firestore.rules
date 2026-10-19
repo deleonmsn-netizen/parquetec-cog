@@ -32,6 +32,12 @@ service cloud.firestore {
         allow delete: if coordenacao();
       }
 
+      // Data do agendamento (AAAA-MM-DD) é hoje ou depois, no horário de Brasília.
+      function hojeOuDepois(dia) {
+        return dia is string && dia.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")
+          && timestamp.date(int(dia.split("-")[0]), int(dia.split("-")[1]), int(dia.split("-")[2])) + duration.value(1, "d") > request.time - duration.value(3, "h");
+      }
+
       // Agendamento aprovado, ainda não retirado, de quem está logado.
       function aprovadoPraMim(r) {
         return (r.get("paraEmail", r.criadoPorEmail) == email()
@@ -45,7 +51,7 @@ service cloud.firestore {
       match /reservas/{d} {
         allow read: if liberado();
         allow create: if equipe() || (liberado() && request.resource.data.criadoPorEmail == email()
-          && request.resource.data.get("paraEmail", email()) == email()
+          && request.resource.data.get("paraEmail", email()) == email() && hojeOuDepois(request.resource.data.data)
           && !("status" in request.resource.data) && request.resource.data.get("aprovado", false) == false);
         allow update: if equipe() || (liberado() && aprovadoPraMim(resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["retirado", "retiradoEm"])
@@ -72,10 +78,14 @@ service cloud.firestore {
           && request.resource.data.tipo == get(/databases/$(database)/documents/escolas/$(escola)/reservas/$(request.resource.data.reservaId)).data.tipo;
         allow update: if liberado() && resource.data.responsavelEmail == email()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["aDevolver"]);
+        // Aviso de atraso (feito pelo script de e-mail): só marca uma vez, numa retirada em aberto.
+        allow update: if liberado() && resource.data.aberto == true && !("atrasoAvisado" in resource.data)
+          && request.time.toMillis() > resource.data.get("devolverAte", 0)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["atrasoAvisado"]);
       }
 
       // Versão destas regras: o app avisa a coordenação quando o Firebase está com regras antigas.
-      match /versao/{v} { allow read: if liberado() && v == "regras-6"; }
+      match /versao/{v} { allow read: if liberado() && v == "regras-7"; }
 
       // Retiradas, devoluções e pessoas: todos leem, só a equipe grava.
       match /{colecao}/{doc} {

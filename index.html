@@ -443,7 +443,7 @@ const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform
 const S = { config: null, configLoaded: false, pessoas: [], abertos: [], hist: [], parados: [], reservas: [], recados: [], acessos: [], inv: {}, resHoje: [], futuras: [], pedidos: [], meuPedido: null };
 const CONF = window.PARQUETEC_FIREBASE || {};
 // Versão do app e das regras do Firebase (firestore.rules, bloco "versao"). Troque juntas quando as regras mudarem.
-const VERSAO = "19", REGRAS = "regras-6";
+const VERSAO = "20", REGRAS = "regras-7";
 const meuEmail = () => String(AUTH && AUTH.email || "").toLowerCase();
 const souDono = () => !!(CONF.dono && meuEmail() === String(CONF.dono).toLowerCase());
 const meuAcesso = () => S.meuAc || S.acessos.find(a => a.id === meuEmail());
@@ -1889,12 +1889,14 @@ const acts = {
     let novo;
     try { novo = await FB.criarConta(email, senha); }
     catch (e) { t.disabled = false; return toast(e && e.code === "auth/invalid-email" ? "Esse e-mail não é válido." : e && e.code === "auth/weak-password" ? "Senha fraca demais. Use pelo menos 6 caracteres." : "Não deu para criar o login. Confira a internet.", 5000); }
-    const ps = await pessoaDoLogin(nome, papel);
+    // Login dos avisos automáticos (script de e-mail): não vira pessoa que pega equipamento.
+    const robo = email.includes("+avisos@");
+    const ps = robo ? { id: "" } : await pessoaDoLogin(nome, papel);
     if (!ps) { t.disabled = false; return; }
     if (await write(() => DB.doc("acessos/" + email).set({ nome, papel, pessoaId: ps.id, criadoEm: Date.now(), criadoPor: meuEmail() }),
       novo ? `Acesso criado para ${nome.split(" ")[0]}. Passe o e-mail e a senha para a pessoa.` : `${nome.split(" ")[0]} já tinha login: ela entra com a senha que já usa, ou toca em “Esqueci a senha”.`)) {
       ["#ac-nome", "#ac-email", "#ac-senha"].forEach(id => { const el = $(id); if (el) el.value = ""; });
-      avisarEmail({ tipo: "aprovado", para: email, nome, papel: PAPEIS[papel], manual: true });
+      if (!robo) avisarEmail({ tipo: "aprovado", para: email, nome, papel: PAPEIS[papel], manual: true });
     }
     t.disabled = false;
   },

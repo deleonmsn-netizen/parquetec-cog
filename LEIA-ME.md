@@ -92,7 +92,7 @@ Também serve qualquer outra hospedagem de site estático (Netlify, Firebase Hos
 
 ## Atrasos, defeitos e relatório
 
-- **Prazo de devolução**: com agendamento, é o fim da aula mais 30 minutos; sem agendamento, é o horário limite do dia (Gerenciar → Ajustes, padrão 18:00). Passou do prazo, a retirada aparece em vermelho em **Devoluções atrasadas**, a coordenação recebe aviso no app e por e-mail, e o professor também (uma vez por retirada).
+- **Prazo de devolução**: com agendamento, é o fim da aula mais 30 minutos; sem agendamento, é o horário limite do dia (Gerenciar → Ajustes, padrão 18:00). Passou do prazo, a retirada aparece em vermelho em **Devoluções atrasadas**, a coordenação recebe aviso no app e por e-mail, e o professor também (uma vez por retirada). O e-mail sai mesmo com todos os aparelhos desligados: o script de e-mail confere os atrasos a cada hora (veja "Aviso de atraso com o app fechado").
 - **Devolução com defeito**: ao marcar "Devolvi", o professor pode contar o problema. Na conferência, a coordenação toca em **Algum voltou com problema?**, marca os códigos e escreve o que aconteceu: eles entram como devolvidos e vão direto para manutenção.
 - **Relatório de uso** (Histórico → Relatório de uso): por período (este mês, mês passado, últimos 30 dias, este ano), com retiradas, equipamentos, pessoas, atrasos, defeitos, quem mais usou, turmas, modelos, dias da semana e finalidade. Dá para imprimir e baixar a planilha.
 
@@ -101,6 +101,14 @@ Também serve qualquer outra hospedagem de site estático (Netlify, Firebase Hos
 - Para a coordenação: pedido de acesso, novo agendamento de professor, devolução marcada pelo professor e devolução atrasada.
 - Para o professor: acesso liberado ou recusado, agendamento aprovado ou recusado e devolução atrasada.
 - Limites de segurança no script: no máximo 80 e-mails por dia e 6 para a mesma pessoa, sem links vindos de fora.
+
+### Aviso de atraso com o app fechado (feito uma vez só)
+
+1. No app, em **Gerenciar → Acessos → Dar acesso**, crie um login só para os avisos: nome "Avisos automáticos", e-mail `gomescomendadoroliveira+avisos@gmail.com`, uma senha forte e perfil **Professor**. Esse login não aparece na lista de pessoas.
+2. No script (script.google.com), clique na engrenagem (**Configurações do projeto**) → **Propriedades do script** → **Adicionar propriedade**: `ROBO_EMAIL` com o e-mail acima e `ROBO_SENHA` com a senha. Salve.
+3. Volte ao código (ícone `< >`), escolha a função **instalarVerificacao** no menu ao lado de "Depurar" e clique em **Executar**. Autorize.
+
+Pronto: a cada hora o script confere as retiradas e manda os e-mails de atraso. O login dos avisos só consegue ler e marcar "atraso avisado", e só depois do prazo vencido.
 
 ## Avisos para a coordenação
 
@@ -126,7 +134,7 @@ O próprio app mostra um botão **Instalar** no Painel quando o aparelho permite
 - O site publicado tem só o código do app e o logo. Os dados (pessoas, retiradas, histórico, recados) ficam no Firebase.
 - Só lê ou muda os dados quem a coordenação liberou em **Acessos ao app**. Se alguém criar uma conta por fora, ela entra mas não vê nada: aparece "Sem acesso ainda".
 - A conta da coordenação só vale depois de confirmar o e-mail, então ninguém consegue se passar por ela.
-- As regras do Firebase também impedem que um operador mude equipamentos, configurações ou acessos, mesmo tentando por fora do app.
+- As regras do Firebase também impedem que um operador mude equipamentos, configurações ou acessos, mesmo tentando por fora do app. E o professor não consegue agendar em data passada, se aprovar sozinho nem retirar mais do que foi aprovado.
 - A `apiKey` que vai no `config.js` não é senha: o Google faz ela para ficar visível no site. O que protege os dados são as regras e os logins.
 - O app não tem acesso a nenhum outro sistema, computador ou e-mail da escola.
 - Use um login para cada pessoa, com senha forte, e remova o acesso de quem sair da escola.
